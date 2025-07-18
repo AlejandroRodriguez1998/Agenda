@@ -29,7 +29,7 @@ export default function BottomNav() {
   return (
     <nav
       className="navbar fixed-bottom navbar-light bg-light border-top shadow-sm d-flex justify-content-around"
-      style={{ height: '60px' }}
+      style={{ height: '60px', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <Link
         href="/"
