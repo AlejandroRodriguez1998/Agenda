@@ -15,6 +15,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <>
+      <div className="mt-5 pt-2"></div>
       <Component {...pageProps} />
       <BottomNav />
       {isClient && <Toaster position="top-center" reverseOrder={false} />}
