@@ -33,7 +33,7 @@ export default function BottomNav() {
     left: 0,
     right: 0,
     paddingTop: '8px',
-    paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
+    paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3px)',
     backgroundColor: '#1a1a1a',
     color: '#ffffff',
     borderTop: '1px solid #333',
