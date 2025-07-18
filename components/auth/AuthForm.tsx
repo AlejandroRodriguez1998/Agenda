@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/router'
+import { supabase } from '@/lib/supabaseClient'
+import styles from './AuthForm.module.css'
+import toast from 'react-hot-toast'
 
 export default function AuthForm() {
   const [email, setEmail] = useState('')
@@ -11,47 +13,98 @@ export default function AuthForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (isLogin) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) return alert('❌ ' + error.message)
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password })
-      if (error) return alert('❌ ' + error.message)
+    const action = isLogin
+      ? supabase.auth.signInWithPassword({ email, password })
+      : supabase.auth.signUp({ email, password })
+
+    const { error } = await action
+
+    if (error) {
+      const traduccion = traducirError(error.message)
+      toast.error(traduccion, {
+        style: {
+          background: '#1a1a1a',
+          color: '#fff',
+        },
+      })
+      return
     }
 
-    router.push('/') // redirigir al inicio tras login/registro
+    toast.success(isLogin ? 'Sesión iniciada' : 'Registro completado', {
+      style: {
+        background: '#1a1a1a',
+        color: '#fff',
+      },
+    })
+
+    router.push('/')
+  }
+
+  function traducirError(mensaje: string): string {
+    const errores: Record<string, string> = {
+      'Invalid login credentials': 'Credenciales incorrectas',
+      'Email not confirmed': 'Debes confirmar tu correo antes de iniciar sesión',
+      'User already registered': 'El usuario ya está registrado',
+      'Invalid email or password': 'Correo o contraseña incorrectos',
+      'Password should be at least 6 characters': 'La contraseña debe tener al menos 6 caracteres',
+      'User not found': 'Usuario no encontrado',
+      'Email is invalid': 'El correo no es válido',
+    }
+
+    return errores[mensaje] || 'Error desconocido'
   }
 
   return (
-    <div className="max-w-md mx-auto mt-10 p-4 border rounded shadow">
-      <h2 className="text-xl font-bold mb-4">{isLogin ? 'Iniciar sesión' : 'Registrarse'}</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className={styles.wrapper}>
+      <form className={styles.form} onSubmit={handleSubmit}>
+        <div className={styles.title}>
+          {isLogin ? 'Bienvenido de nuevo,' : 'Bienvenido,'}
+          <br />
+          <span>{isLogin ? 'inicia sesión para continuar' : 'registrarse para continuar'}</span>
+        </div>
+
         <input
-          className="w-full border px-3 py-2"
+          className={styles.input}
           type="email"
-          placeholder="Correo"
+          name="email"
+          placeholder="Correo electrónico"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
         />
+
         <input
-          className="w-full border px-3 py-2"
+          className={styles.input}
           type="password"
+          name="password"
           placeholder="Contraseña"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-        <button className="w-full bg-blue-600 text-white py-2 rounded" type="submit">
-          {isLogin ? 'Entrar' : 'Registrarse'}
+
+        <button type="submit" className={styles['button-confirm']}>
+          {isLogin ? 'Acceder' : 'Registrarse'} →
         </button>
+
+        <p style={{ fontSize: '0.9rem', marginTop: '10px', color: 'black' }}>
+          {isLogin ? '¿No tienes cuenta?' : '¿Tienes una cuenta?'}{' '}
+          <button
+            type="button"
+            onClick={() => setIsLogin(!isLogin)}
+            style={{
+              color: 'blue',
+              background: 'none',
+              border: 'none',
+              textDecoration: 'underline',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            {isLogin ? 'Registrarse' : 'Iniciar Sesión'}
+          </button>
+        </p>
       </form>
-      <p className="mt-4 text-sm text-center">
-        {isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}{' '}
-        <button onClick={() => setIsLogin(!isLogin)} className="text-blue-600 underline">
-          {isLogin ? 'Regístrate' : 'Inicia sesión'}
-        </button>
-      </p>
     </div>
   )
 }
