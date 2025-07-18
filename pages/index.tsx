@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 
 export default function InicioPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null)
 
   useEffect(() => {
     if (localStorage.getItem('showLogoutToast') === 'true') {
