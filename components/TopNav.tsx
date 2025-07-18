@@ -23,7 +23,7 @@ export default function TopNav({
   return (
     <nav
       className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom"
-      style={{ backgroundColor: '#1e1e1e', color: 'white' }}
+      style={{ backgroundColor: '#1e1e1e', color: 'white', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1050,}}
     >
       <ModalUsuario />
       <h5 className="mb-0 text-center flex-grow-1">{title}</h5>
