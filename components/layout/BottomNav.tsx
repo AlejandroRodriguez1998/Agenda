@@ -29,7 +29,16 @@ export default function BottomNav() {
   return (
     <nav
       className="navbar fixed-bottom navbar-light bg-light border-top shadow-sm d-flex justify-content-around"
-      style={{ height: '60px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
+       style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingTop: '8px',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+        backgroundColor: '#f8f9fa',
+        zIndex: 1000,
+      }}
     >
       <Link
         href="/"
