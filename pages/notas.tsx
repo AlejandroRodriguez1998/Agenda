@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/router'
+import { supabase } from '@/lib/supabaseClient'
+import TopNav from '@/components/TopNav'
+import ModalNota from '@/components/ModalNota'
+import Swal from 'sweetalert2'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 
 type Asignatura = {
   id: string
@@ -14,6 +18,7 @@ type Nota = {
   nota: number
   peso: number
   created_at: string
+  asignatura_id: string
 }
 
 export default function NotasPage() {
@@ -21,10 +26,9 @@ export default function NotasPage() {
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
   const [seleccionada, setSeleccionada] = useState<string | null>(null)
   const [notas, setNotas] = useState<Nota[]>([])
-  const [tipo, setTipo] = useState('')
-  const [nota, setNota] = useState('')
-  const [peso, setPeso] = useState('')
+  const [notasPorAsignatura, setNotasPorAsignatura] = useState<Record<string, Nota[]>>({})
   const [cargando, setCargando] = useState(true)
+  const [modalVisible, setModalVisible] = useState(false)
 
   useEffect(() => {
     const verificarSesion = async () => {
@@ -32,168 +36,210 @@ export default function NotasPage() {
       if (!data.session?.user) {
         router.push('/login')
       } else {
-        await cargarAsignaturas()
+        await cargarAsignaturasYNotas()
       }
     }
 
     verificarSesion()
   }, [router])
 
-  const cargarAsignaturas = async () => {
-    const { data, error } = await supabase
+  const cargarAsignaturasYNotas = async () => {
+    setCargando(true)
+
+    const { data: asignaturasData } = await supabase
       .from('asignaturas')
       .select('*')
       .order('nombre', { ascending: true })
 
-    if (!error && data) setAsignaturas(data)
+    const { data: notasData } = await supabase
+      .from('notas_academicas')
+      .select('*')
+      .order('created_at', { ascending: true })
+
+    if (asignaturasData && notasData) {
+      setAsignaturas(asignaturasData)
+      const agrupadas = asignaturasData.reduce((acc, asignatura) => {
+        acc[asignatura.id] = notasData.filter(n => n.asignatura_id === asignatura.id)
+        return acc
+      }, {} as Record<string, Nota[]>)
+
+      setNotasPorAsignatura(agrupadas)
+
+      if (seleccionada) {
+        setNotas(agrupadas[seleccionada] || [])
+      }
+    }
+
     setCargando(false)
   }
 
   const cargarNotas = async (asignaturaId: string) => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('notas_academicas')
       .select('*')
       .eq('asignatura_id', asignaturaId)
       .order('created_at', { ascending: true })
 
-    if (!error && data) setNotas(data)
-  }
-
-  const añadirNota = async () => {
-    if (!tipo || !nota || !peso || !seleccionada) return
-    const { data: sessionData } = await supabase.auth.getSession()
-    const userId = sessionData.session?.user?.id
-    if (!userId) return
-
-    const { error } = await supabase.from('notas_academicas').insert({
-      user_id: userId,
-      asignatura_id: seleccionada,
-      tipo,
-      nota: parseFloat(nota),
-      peso: parseFloat(peso),
-    })
-
-    if (!error) {
-      setTipo('')
-      setNota('')
-      setPeso('')
-      cargarNotas(seleccionada)
-    }
+    if (data) setNotas(data)
   }
 
   const eliminarNota = async (id: string) => {
-    if (!seleccionada) return
-    await supabase.from('notas_academicas').delete().eq('id', id)
-    cargarNotas(seleccionada)
+    const confirmar = await Swal.fire({
+      title: '¿Estás seguro?',
+      text: 'Esta acción no se puede deshacer',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+    })
+
+    if (confirmar.isConfirmed) {
+      await supabase.from('notas_academicas').delete().eq('id', id)
+      await cargarAsignaturasYNotas()
+    }
   }
 
-  const notaFinal = notas.reduce((acc, n) => acc + n.nota * (n.peso / 100), 0).toFixed(2)
-  const pesoTotal = notas.reduce((acc, n) => acc + n.peso, 0)
+  const calcularNotaFinal = (notas: Nota[]) => {
+    const pesoTotal = notas.reduce((acc, n) => acc + n.peso, 0)
+    if (pesoTotal === 0) return 0
+    return notas.reduce((acc, n) => acc + n.nota * (n.peso / 100), 0)
+  }
+
+  const notasFinales = asignaturas.map((a) => {
+    const notas = notasPorAsignatura[a.id] || []
+    return {
+      asignatura: a,
+      final: calcularNotaFinal(notas),
+    }
+  }).filter(n => n.final > 0)
+
+  const mediaGlobal =
+    notasFinales.length > 0
+      ? (notasFinales.reduce((acc, n) => acc + n.final, 0) / notasFinales.length).toFixed(2)
+      : null
 
   return (
-    <div className="container mt-4">
-      <h2 className="mb-4 text-center">📊 Notas académicas</h2>
+    <>
+      <TopNav
+        title="📊 Notas"
+        showAdd={!!seleccionada}
+        onAddClick={() => setModalVisible(true)}
+      />
 
-      <div className="mb-4">
-        <select
-          className="form-select"
-          onChange={(e) => {
-            setSeleccionada(e.target.value)
-            cargarNotas(e.target.value)
-          }}
-          value={seleccionada || ''}
-        >
-          <option value="">Selecciona una asignatura</option>
-          {asignaturas.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
-      </div>
+      <div className="container mt-4">
+        <div className="mb-4">
+          <select
+            className="form-select"
+            onChange={(e) => {
+              setSeleccionada(e.target.value)
+              if (e.target.value) cargarNotas(e.target.value)
+            }}
+            value={seleccionada || ''}
+          >
+            <option value="">Selecciona una asignatura</option>
+            {asignaturas.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      {seleccionada && (
-        <>
-          <div className="row g-2 mb-4">
-            <div className="col-md-4">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Tipo (Ej: Examen)"
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value)}
-              />
-            </div>
-            <div className="col-md-3">
-              <input
-                type="number"
-                className="form-control"
-                placeholder="Nota (0–10)"
-                min={0}
-                max={10}
-                value={nota}
-                onChange={(e) => setNota(e.target.value)}
-              />
-            </div>
-            <div className="col-md-3">
-              <input
-                type="number"
-                className="form-control"
-                placeholder="Peso (%)"
-                min={1}
-                max={100}
-                value={peso}
-                onChange={(e) => setPeso(e.target.value)}
-              />
-            </div>
-            <div className="col-md-2">
-              <button className="btn btn-success w-100" onClick={añadirNota}>
-                Añadir
-              </button>
-            </div>
-          </div>
+        {!seleccionada && (
+          <>
+            {mediaGlobal ? (
+              <div className="text-center mb-4">
+                <div
+                  style={{
+                    width: 120,
+                    height: 120,
+                    borderRadius: '50%',
+                    backgroundColor: '#0d6efd',
+                    color: 'white',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    fontSize: 28,
+                    fontWeight: 'bold',
+                    margin: '0 auto 1rem',
+                  }}
+                >
+                  {mediaGlobal}
+                </div>
+                <p className="text-white">Media global de todas las asignaturas</p>
+              </div>
+            ) : (
+              <p className="text-white text-center">No hay notas aún.</p>
+            )}
 
-          {notas.length === 0 ? (
-            <p className="text-muted text-center">No hay notas aún.</p>
-          ) : (
-            <table className="table table-bordered">
-              <thead className="table-light">
-                <tr>
-                  <th>Tipo</th>
-                  <th>Nota</th>
-                  <th>Peso</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {notas.map((n) => (
-                  <tr key={n.id}>
-                    <td>{n.tipo}</td>
-                    <td>{n.nota}</td>
-                    <td>{n.peso}%</td>
-                    <td>
-                      <button
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => eliminarNota(n.id)}
-                      >
-                        🗑️
-                      </button>
-                    </td>
+            {notasFinales.map(({ asignatura, final }) => (
+              <div
+                key={asignatura.id}
+                className="d-flex justify-content-between align-items-center mb-2 text-white p-3 rounded"
+                style={{ backgroundColor: asignatura.color || '#343a40' }}
+              >
+                <strong>{asignatura.nombre}</strong>
+                <span className="badge bg-light text-dark">{final.toFixed(2)}</span>
+              </div>
+            ))}
+          </>
+        )}
+
+        {seleccionada && (
+          <>
+            {notas.length === 0 ? (
+              <p className="text-white text-center">No hay notas aún.</p>
+            ) : (
+              <table className="table table-bordered">
+                <thead className="table-light">
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Nota</th>
+                    <th>Peso</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot className="table-light">
-                <tr>
-                  <td className="fw-bold">Final</td>
-                  <td className="fw-bold">{notaFinal}</td>
-                  <td className="fw-bold">{pesoTotal}%</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          )}
-        </>
-      )}
-    </div>
+                </thead>
+                <tbody>
+                  {notas.map((n) => (
+                    <tr key={n.id}>
+                      <td>{n.tipo}</td>
+                      <td>{n.nota}</td>
+                      <td>{n.peso}%</td>
+                      <td>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => eliminarNota(n.id)}
+                        >
+                          <FontAwesomeIcon icon="trash" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="table-light">
+                  <tr>
+                    <td className="fw-bold">Final</td>
+                    <td className="fw-bold">{calcularNotaFinal(notas).toFixed(2)}</td>
+                    <td className="fw-bold">
+                      {notas.reduce((acc, n) => acc + n.peso, 0)}%
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+
+            <ModalNota
+              visible={modalVisible}
+              asignaturaId={seleccionada}
+              onClose={() => setModalVisible(false)}
+              onSuccess={cargarAsignaturasYNotas}
+            />
+          </>
+        )}
+      </div>
+    </>
   )
 }

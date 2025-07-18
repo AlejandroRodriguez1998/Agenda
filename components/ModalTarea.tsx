@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import Swal from 'sweetalert2'
-import withReactContent from 'sweetalert2-react-content'
 import toast from 'react-hot-toast'
 
 type TareaModalProps = {
@@ -16,111 +14,123 @@ type TareaModalProps = {
   }
 }
 
-const MySwal = withReactContent(Swal)
-
 export default function ModalTarea({ visible, onClose, onSuccess, tarea }: TareaModalProps) {
   const [asignaturas, setAsignaturas] = useState<{ id: string; nombre: string }[]>([])
+  const [asignaturaId, setAsignaturaId] = useState(tarea?.asignatura_id || '')
+  const [titulo, setTitulo] = useState(tarea?.titulo || '')
+  const [fecha, setFecha] = useState(tarea?.fecha_entrega || '')
 
   useEffect(() => {
-    if (!visible) return
+    supabase
+      .from('asignaturas')
+      .select('id, nombre')
+      .then(({ data }) => {
+        if (data) setAsignaturas(data)
+      })
+  }, [])
 
-    const fetchAndOpen = async () => {
-      const { data } = await supabase.from('asignaturas').select('id, nombre')
-      if (data) {
-        setAsignaturas(data)
-        abrirModal(data)
-      }
+  useEffect(() => {
+    if (tarea) {
+      setAsignaturaId(tarea.asignatura_id)
+      setTitulo(tarea.titulo)
+      setFecha(tarea.fecha_entrega)
+    } else {
+      setAsignaturaId('')
+      setTitulo('')
+      setFecha('')
+    }
+  }, [tarea])
+
+  const handleGuardar = async () => {
+    if (!titulo.trim() || !asignaturaId) {
+      toast.error('Rellena todos los campos', {
+        style: {
+          background: '#1a1a1a',
+          color: '#fff',
+        },
+      })
+      return
     }
 
-    fetchAndOpen()
-  }, [visible])
+    const { data: session } = await supabase.auth.getSession()
+    const userId = session.session?.user?.id
+    if (!userId) return toast.error('No hay sesión activa', {
+        style: {
+          background: '#1a1a1a',
+          color: '#fff',
+        },
+      })
 
-  const abrirModal = (asignaturas: { id: string; nombre: string }[]) => {
-    const asignaturaDefault = tarea?.asignatura_id ?? ''
-    const tituloDefault = tarea?.titulo ?? ''
-    const fechaDefault = tarea?.fecha_entrega ?? ''
-
-    const formatearFecha = (fechaISO: string) => {
-      try {
-        return new Date(fechaISO).toISOString().split('T')[0]
-      } catch {
-        return ''
-      }
+    const payload = {
+      titulo: titulo.trim(),
+      fecha_entrega: fecha,
+      asignatura_id: asignaturaId,
+      user_id: userId,
     }
 
-    MySwal.fire({
-      title: tarea ? 'Editar tarea' : 'Nueva tarea',
-      html: `<div style="display: flex; flex-direction: column; gap: 10px;">
-        <select id="swal-asignatura" style="width: 100%; padding: 14px; font-size: 1rem;">
-        <option value="">Selecciona una asignatura</option>
-        ${asignaturas
-            .map(
-            (a) =>
-                `<option value="${a.id}" ${a.id === asignaturaDefault ? 'selected' : ''}>${a.nombre}</option>`
-            )
-            .join('')}
-        </select>
-        <input id="swal-titulo" placeholder="Título" style="width: 100%; padding: 14px; font-size: 1rem;" />
-        <input id="swal-fecha" type="date" style="width: 100%; padding: 14px; font-size: 1rem;" />
-      </div>`,
-      didOpen: () => {
-        const tituloInput = document.getElementById('swal-titulo') as HTMLInputElement
-        const fechaInput = document.getElementById('swal-fecha') as HTMLInputElement
+    const { error } = tarea
+      ? await supabase.from('tareas').update(payload).eq('id', tarea.id)
+      : await supabase.from('tareas').insert(payload)
 
-        if (tituloInput) tituloInput.value = tituloDefault
-        if (fechaInput && fechaDefault) fechaInput.value = formatearFecha(fechaDefault)
-      },
-      showCancelButton: true,
-      confirmButtonText: tarea ? 'Guardar cambios' : 'Crear tarea',
-      cancelButtonText: 'Cancelar',
-      background: '#1e1e1e',
-      color: '#fff',
-      customClass: {
-        popup: 'rounded',
-      },
-      preConfirm: async () => {
-        const asignaturaId = (document.getElementById('swal-asignatura') as HTMLSelectElement).value
-        const titulo = (document.getElementById('swal-titulo') as HTMLInputElement).value.trim()
-        const fecha = (document.getElementById('swal-fecha') as HTMLInputElement).value
-
-        if (!titulo || !asignaturaId) {
-          Swal.showValidationMessage('Debes rellenar todos los campos obligatorios')
-          return false
-        }
-
-        const { data: session } = await supabase.auth.getSession()
-        const userId = session.session?.user?.id
-        if (!userId) {
-          Swal.showValidationMessage('No hay sesión activa')
-          return false
-        }
-
-        const payload = {
-          titulo,
-          fecha_entrega: fecha,
-          asignatura_id: asignaturaId,
-          user_id: userId,
-        }
-
-        const { error } = tarea
-          ? await supabase.from('tareas').update(payload).eq('id', tarea.id)
-          : await supabase.from('tareas').insert(payload)
-
-        if (error) {
-          Swal.showValidationMessage(error.message)
-          return false
-        }
-
-        return true
-      },
-    }).then((result) => {
-      if (result.isConfirmed) {
-        toast.success(tarea ? 'Tarea actualizada' : 'Tarea creada')
-        onSuccess()
-      }
+    if (error) {
+      toast.error(error.message, {
+        style: {
+          background: '#1a1a1a',
+          color: '#fff',
+        },
+      })
+    } else {
+      toast.success(tarea ? 'Tarea actualizada' : 'Tarea añadida', {
+        style: {
+          background: '#1a1a1a',
+          color: '#fff',
+        },
+      })
+      setAsignaturaId('')
+      setTitulo('')
+      setFecha('')
+      onSuccess()
       onClose()
-    })
+    }
   }
 
-  return null
+  if (!visible) return null
+
+  return (
+    <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+      <div className="modal-dialog modal-dialog modal-dialog-centered">
+        <div className="modal-content bg-dark text-white">
+          <div className="modal-body">
+            <div className="text-center">
+              <h3 className="mb-0">{tarea ? 'Editar Tarea' : 'Nueva Tarea'}</h3>
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Nombre</label>
+              <input className="form-control" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Asignatura</label>
+              <select className="form-select" value={asignaturaId} onChange={(e) => setAsignaturaId(e.target.value)}>
+                <option value="">Selecciona una</option>
+                {asignaturas.map((a) => (
+                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Fecha de entrega</label>
+              <input type="date" className="form-control" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            </div>
+            <div className="d-flex justify-content-center gap-2 mt-4">
+              <button className="btn btn-primary" onClick={handleGuardar}>
+                {tarea ? 'Guardar cambios' : 'Crear tarea'}
+              </button>
+              <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }

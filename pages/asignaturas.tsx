@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
+import ModalAsignatura from '@/components/ModalAsignatura'
+import TopNav from '@/components/TopNav'
+import Swal from 'sweetalert2'
+
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 
 type Asignatura = {
   id: string
@@ -11,9 +16,8 @@ type Asignatura = {
 export default function AsignaturasPage() {
   const router = useRouter()
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
-  const [nombre, setNombre] = useState('')
-  const [color, setColor] = useState('#007bff')
   const [cargando, setCargando] = useState(true)
+  const [modalVisible, setModalVisible] = useState(false)
 
   useEffect(() => {
     const cargar = async () => {
@@ -31,99 +35,76 @@ export default function AsignaturasPage() {
 
   const cargarAsignaturas = async () => {
     setCargando(true)
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('asignaturas')
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (!error && data) setAsignaturas(data)
+    if (data) setAsignaturas(data)
     setCargando(false)
   }
 
-  const añadirAsignatura = async () => {
-    const { data: sessionData } = await supabase.auth.getSession()
-    const userId = sessionData.session?.user?.id
-    if (!nombre.trim() || !userId) return
+  const eliminarAsignatura = async (id: string) => {
+    const confirmar = await Swal.fire({
+      title: '¿Estás seguro?',
+      text: 'Esta acción eliminará la asignatura y no se puede deshacer',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+    })
 
-    const { error } = await supabase
-      .from('asignaturas')
-      .insert({ nombre: nombre.trim(), color, user_id: userId })
-
-    if (!error) {
-      setNombre('')
-      await cargarAsignaturas()
+    if (confirmar.isConfirmed) {
+      const { error } = await supabase.from('asignaturas').delete().eq('id', id)
+      if (!error) await cargarAsignaturas()
     }
   }
 
-  const eliminarAsignatura = async (id: string) => {
-    const { error } = await supabase.from('asignaturas').delete().eq('id', id)
-    if (!error) await cargarAsignaturas()
-  }
-
   return (
-    <div className="container mt-4">
-      <h2 className="text-center mb-4">📚 Asignaturas</h2>
-
-      <div className="row mb-4">
-        <div className="col-md-6">
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Nombre de la asignatura"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-          />
-        </div>
-        <div className="col-md-3">
-          <input
-            type="color"
-            className="form-control form-control-color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            title="Color"
-          />
-        </div>
-        <div className="col-md-3">
-          <button className="btn btn-primary w-100" onClick={añadirAsignatura}>
-            Añadir
-          </button>
-        </div>
-      </div>
-
-      {cargando ? (
-        <div className="text-center">
-          <div className="spinner-border text-primary" role="status" />
-        </div>
-      ) : asignaturas.length === 0 ? (
-        <p className="text-muted text-center">No tienes asignaturas.</p>
-      ) : (
-        <ul className="list-group">
-          {asignaturas.map((a) => (
-            <li
-              key={a.id}
-              className="list-group-item d-flex justify-content-between align-items-center"
-            >
-              <span>
-                <span
-                  className="me-2 d-inline-block rounded-circle"
-                  style={{
-                    width: 12,
-                    height: 12,
-                    backgroundColor: a.color || '#ccc',
-                  }}
-                ></span>
-                {a.nombre}
-              </span>
-              <button
-                className="btn btn-sm btn-outline-danger"
-                onClick={() => eliminarAsignatura(a.id)}
+    <>
+      <TopNav 
+      title="📚 Asignaturas" 
+      onAddClick={() => setModalVisible(true)} 
+      />
+      <div className="container mt-4">
+        {cargando ? (
+          <div className="text-center mt-4">
+            <div className="spinner-border text-primary" role="status" />
+          </div>
+        ) : asignaturas.length === 0 ? (
+          <p className="text-white text-center mt-4">No tienes asignaturas.</p>
+        ) : (
+          <ul className="list-group mt-4">
+            {asignaturas.map((a) => (
+              <li
+                key={a.id}
+                className="list-group-item d-flex justify-content-between align-items-center text-white mb-3"
+                style={{
+                  backgroundColor: a.color || '#343a40',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1rem',
+                }}
               >
-                🗑️
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+                <span className="fw-semibold">{a.nombre}</span>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => eliminarAsignatura(a.id)}
+                >
+                  <FontAwesomeIcon icon="trash" size="lg" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <ModalAsignatura
+          visible={modalVisible}
+          onClose={() => setModalVisible(false)}
+          onSuccess={cargarAsignaturas} />
+      </div>
+    </>
   )
 }

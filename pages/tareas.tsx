@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import ModalTarea from '@/components/ModalTarea'
+import TopNav from '@/components/TopNav'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 
 type Tarea = {
   id: string
@@ -90,7 +92,12 @@ export default function TareasPage() {
     if (result.isConfirmed) {
       const { error } = await supabase.from('tareas').delete().eq('id', id)
       if (!error) {
-        toast.success('Tarea eliminada')
+        toast.success('Tarea eliminada', {
+        style: {
+          background: '#1a1a1a',
+          color: '#fff',
+        },
+      })
         await cargarAsignaturasYtareas()
       }
     }
@@ -100,99 +107,90 @@ export default function TareasPage() {
     return <p className="p-4">Verificando sesión...</p>
   }
 
+  
+
   return (
-    <div className="container mt-5">
-      <h1 className="text-center mb-2">📝 Tareas por asignatura</h1>
-      <div className="text-center mb-4">
-        <button
-          className="btn btn-success"
-          onClick={() => {
-            setTareaEditando(null)
-            setModalVisible(true)
-          }}
-        >
-          ➕ Añadir tarea
-        </button>
-      </div>
-
-      {cargando ? (
-        <div className="text-center">
-          <div className="spinner-border text-primary" role="status" />
-        </div>
-      ) : asignaturas.length === 0 ? (
-        <p className="text-muted text-center">No tienes tareas aún.</p>
-      ) : (
-        asignaturas.map((asignatura) => (
-          <div
-            key={asignatura.id}
-            className="mb-4 p-4 rounded text-white"
-            style={{
-              backgroundColor: asignatura.color || '#343a40',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-            }}
-          >
-            <h5 className="mb-3">{asignatura.nombre}</h5>
-
-            {asignatura.tareas.map((tarea) => (
-              <div key={tarea.id} className="d-flex justify-content-between align-items-start mb-2">
-                <div className="form-check">
-                  <input
-                    className="form-check-input me-2"
-                    type="checkbox"
-                    checked={tarea.completada}
-                    onChange={(e) => cambiarEstado(tarea.id, e.target.checked)}
-                  />
-                  <label
-                    className={`form-check-label ${
-                      tarea.completada ? 'text-decoration-line-through text-muted' : ''
-                    }`}
-                  >
-                    {tarea.titulo}
-                  </label>
-                  {tarea.fecha_entrega && (
-                    <div className="small mt-1 text-light">
-                      📅 {new Date(tarea.fecha_entrega).toLocaleDateString()}
-                    </div>
-                  )}
-                </div>
-                <div className="ms-2">
-                  <button
-                    className="btn btn-sm btn-outline-light me-2"
-                    onClick={() => {
-                      setTareaEditando(tarea)
-                      setModalVisible(true)
-                    }}
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    className="btn btn-sm btn-outline-light"
-                    onClick={() => eliminarTarea(tarea.id)}
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-            ))}
+    <>
+      <TopNav
+      title="📝 Tareas"
+      onAddClick={() => {
+        setTareaEditando(null)
+        setModalVisible(true)
+      } } /> 
+      <div className="container mt-4">
+        {cargando ? (
+          <div className="text-center">
+            <div className="spinner-border text-primary" role="status" />
           </div>
-        ))
-      )}
+        ) : asignaturas.length === 0 ? (
+          <p className="text-white text-center">No tienes tareas aún.</p>
+        ) : (
+          asignaturas.map((asignatura) => (
+            <div
+              key={asignatura.id}
+              className="mb-4 p-4 rounded text-white"
+              style={{
+                backgroundColor: asignatura.color || '#343a40',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+              }}
+            >
+              <h5 className="mb-3">{asignatura.nombre}</h5>
 
-      <ModalTarea
-        visible={modalVisible}
-        tarea={
-          tareaEditando
+              {asignatura.tareas.map((tarea) => (
+                <div key={tarea.id} className="d-flex justify-content-between align-items-start mb-2">
+                  <div className="form-check">
+                    <input
+                      className="form-check-input me-2"
+                      type="checkbox"
+                      checked={tarea.completada}
+                      onChange={(e) => cambiarEstado(tarea.id, e.target.checked)} />
+                    <label
+                      className={`form-check-label ${tarea.completada ? 'text-decoration-line-through text-muted' : ''}`}
+                    >
+                      {tarea.titulo}
+                    </label>
+                    {tarea.fecha_entrega && (
+                      <div className="small mt-1 text-light">
+                        📅 {new Date(tarea.fecha_entrega).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="ms-2">
+                    <button
+                      className="btn btn-secondary btn-sm me-2"
+                      onClick={() => {
+                        setTareaEditando(tarea)
+                        setModalVisible(true)
+                      } }
+                    >
+                      <FontAwesomeIcon icon="pencil" size="lg" />
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => eliminarTarea(tarea.id)}
+                    >
+                      <FontAwesomeIcon icon="trash" size="lg" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+
+        <ModalTarea
+          visible={modalVisible}
+          tarea={tareaEditando
             ? {
-                id: tareaEditando.id,
-                titulo: tareaEditando.titulo,
-                fecha_entrega: tareaEditando.fecha_entrega ?? '',
-                asignatura_id: tareaEditando.asignatura_id,
-              }
-            : undefined
-        }
-        onClose={() => setModalVisible(false)}
-        onSuccess={cargarAsignaturasYtareas}
-      />
-    </div>
+              id: tareaEditando.id,
+              titulo: tareaEditando.titulo,
+              fecha_entrega: tareaEditando.fecha_entrega ?? '',
+              asignatura_id: tareaEditando.asignatura_id,
+            }
+            : undefined}
+          onClose={() => setModalVisible(false)}
+          onSuccess={cargarAsignaturasYtareas} />
+      </div>
+    </>
   )
 }
