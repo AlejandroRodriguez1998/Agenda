@@ -3,8 +3,6 @@
 Aplicación web moderna para gestionar tu vida académica: horarios, tareas, exámenes y notas.  
 Construida con **Next.js**, desplegada en **Vercel**, y con **Supabase** como backend.
 
----
-
 ## 🚀 Tecnologías utilizadas
 
 - [Next.js](https://nextjs.org/) — Framework de React
@@ -12,8 +10,6 @@ Construida con **Next.js**, desplegada en **Vercel**, y con **Supabase** como ba
 - [Vercel](https://vercel.com/) — Deploy hosting
 - [Bootstrap 5](https://getbootstrap.com/) — Estilos
 - [FullCalendar](https://fullcalendar.io/) — Calendario interactivo
-
----
 
 ## 📦 Instalación local
 
@@ -41,8 +37,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyXXXX...
 
 > Puedes obtener estos valores desde tu proyecto en [Supabase](https://supabase.com/project/).
 
----
-
 ## 🧪 Ejecutar en desarrollo
 
 ```bash
@@ -50,8 +44,6 @@ npm run dev
 ```
 
 La app estará disponible en: [http://localhost:3000](http://localhost:3000)
-
----
 
 ## ☁️ Despliegue en Vercel
 
@@ -69,8 +61,6 @@ La app estará disponible en: [http://localhost:3000](http://localhost:3000)
 ```
 https://agenda-topaz-two.vercel.app/
 ```
-
----
 
 ## 🗃️ Configuración de Supabase
 
@@ -109,8 +99,6 @@ Asegúrate de tener las siguientes tablas en Supabase:
 | color    | text    |
 | created_at | timestamptz |
 
----
-
 ## 🧠 Funcionalidades
 
 - ✅ Registro e inicio de sesión
@@ -121,13 +109,10 @@ Asegúrate de tener las siguientes tablas en Supabase:
 - ✅ Estilo adaptado a escritorio y móvil
 - ✅ Soporte para multicuenta (usuarios aislados por Supabase)
 
----
 
 ## 📬 Contacto
 
 Creado por **Alejandro Paniagua Rodriguez**  
 📫 Puedes contactarme en [alexcr31@gmail.com](mailto:alexcr31@gmail.com)
-
----
 
 > ¡Gracias por usar Agenda Escolar! 🎓
