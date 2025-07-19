@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import AuthForm from '@/components/auth/AuthForm'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -29,7 +31,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="p-4">
+    <div className="position-relative p-4">
+      {/* Botón arriba a la derecha */}
+      <button
+        className="btn btn-outline-light position-absolute"
+        style={{ top: -41, right: 20 }}
+        onClick={() => router.push('/')}
+      >
+        <FontAwesomeIcon icon={faArrowLeft} className="me-2" />
+        Volver
+      </button>
+
       <AuthForm />
     </div>
   )
