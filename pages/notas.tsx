@@ -5,6 +5,8 @@ import TopNav from '@/components/TopNav'
 import ModalNota from '@/components/ModalNota'
 import Swal from 'sweetalert2'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import  Head  from 'next/head'
+import { faTrash } from '@fortawesome/free-solid-svg-icons'
 
 type Asignatura = {
   id: string
@@ -74,6 +76,7 @@ export default function NotasPage() {
   }
 
   const cargarNotas = async (asignaturaId: string) => {
+    setCargando(true)
     const { data } = await supabase
       .from('notas_academicas')
       .select('*')
@@ -81,6 +84,7 @@ export default function NotasPage() {
       .order('created_at', { ascending: true })
 
     if (data) setNotas(data)
+    setCargando(false)
   }
 
   const eliminarNota = async (id: string) => {
@@ -122,22 +126,17 @@ export default function NotasPage() {
 
   return (
     <>
-      <TopNav
-        title="📊 Notas"
-        showAdd={!!seleccionada}
-        onAddClick={() => setModalVisible(true)}
-      />
+      <Head>
+        <title>Notas</title>
+      </Head>
+      <TopNav title="📊 Notas" showAdd={!!seleccionada} onAddClick={() => setModalVisible(true)}/>
 
-      <div className="container mt-4">
+      <div className="container mt-3">
         <div className="mb-4">
-          <select
-            className="form-select"
-            onChange={(e) => {
-              setSeleccionada(e.target.value)
-              if (e.target.value) cargarNotas(e.target.value)
-            }}
-            value={seleccionada || ''}
-          >
+          <select className="form-select" onChange={(e) => {
+            setSeleccionada(e.target.value)
+            if (e.target.value) cargarNotas(e.target.value)
+          }} value={seleccionada || ''}>
             <option value="">Selecciona una asignatura</option>
             {asignaturas.map((a) => (
               <option key={a.id} value={a.id}>
@@ -147,25 +146,15 @@ export default function NotasPage() {
           </select>
         </div>
 
-        {!seleccionada && (
+        {cargando ? (
+          <div className="text-center mt-5">
+            <div className="spinner-border text-primary" role="status"></div>
+          </div>
+        ) : !seleccionada ? (
           <>
             {mediaGlobal ? (
               <div className="text-center mb-4">
-                <div
-                  style={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: '50%',
-                    backgroundColor: '#0d6efd',
-                    color: 'white',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    fontSize: 28,
-                    fontWeight: 'bold',
-                    margin: '0 auto 1rem',
-                  }}
-                >
+                <div style={{width: 120, height: 120, borderRadius: '50%', backgroundColor: '#0d6efd', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 28, fontWeight: 'bold', margin: '0 auto 1rem',}}>
                   {mediaGlobal}
                 </div>
                 <p className="text-white">Media global de todas las asignaturas</p>
@@ -175,19 +164,13 @@ export default function NotasPage() {
             )}
 
             {notasFinales.map(({ asignatura, final }) => (
-              <div
-                key={asignatura.id}
-                className="d-flex justify-content-between align-items-center mb-2 text-white p-3 rounded"
-                style={{ backgroundColor: asignatura.color || '#343a40' }}
-              >
+              <div key={asignatura.id} className="d-flex justify-content-between align-items-center mb-2 text-white p-3 rounded" style={{ backgroundColor: asignatura.color || '#343a40' }}>
                 <strong>{asignatura.nombre}</strong>
                 <span className="badge bg-light text-dark">{final.toFixed(2)}</span>
               </div>
             ))}
           </>
-        )}
-
-        {seleccionada && (
+        ) : (
           <>
             {notas.length === 0 ? (
               <p className="text-white text-center">No hay notas aún.</p>
@@ -208,11 +191,8 @@ export default function NotasPage() {
                       <td>{n.nota}</td>
                       <td>{n.peso}%</td>
                       <td>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => eliminarNota(n.id)}
-                        >
-                          <FontAwesomeIcon icon="trash" />
+                        <button className="btn btn-sm btn-outline-danger" onClick={() => eliminarNota(n.id)}>
+                          <FontAwesomeIcon icon={faTrash} />
                         </button>
                       </td>
                     </tr>
@@ -222,9 +202,7 @@ export default function NotasPage() {
                   <tr>
                     <td className="fw-bold">Final</td>
                     <td className="fw-bold">{calcularNotaFinal(notas).toFixed(2)}</td>
-                    <td className="fw-bold">
-                      {notas.reduce((acc, n) => acc + n.peso, 0)}%
-                    </td>
+                    <td className="fw-bold">{notas.reduce((acc, n) => acc + n.peso, 0)}%</td>
                     <td></td>
                   </tr>
                 </tfoot>

@@ -27,3 +27,35 @@ html, body {
   font-weight: bold;
   border-radius: 4px;
 }
+
+.fc {
+  border-radius: 6px;
+  color: white;
+}
+
+.fc .fc-daygrid-day-number {
+  color: white;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.fc-daygrid-day.selected-day {
+  background-color: rgba(68, 66, 66, 0.705); /* azul Bootstrap con opacidad */
+}
+
+/* Día seleccionado más destacado */
+.fc .fc-daygrid-day.fc-day-today {
+  background-color: rgba(68, 66, 66, 0.705); /* sutil fondo para hoy */
+}
+
+/* Ajusta el header del calendario en móviles */
+.fc-header-toolbar {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.fc-toolbar-title {
+  font-size: 1.2rem;
+  white-space: nowrap;
+}

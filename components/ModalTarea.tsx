@@ -111,7 +111,7 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea }: Tarea
             <div className="mb-3">
               <label className="form-label">Asignatura</label>
               <select className="form-select" value={asignaturaId} onChange={(e) => setAsignaturaId(e.target.value)}>
-                <option value="">Selecciona una</option>
+                <option value="">Selecciona una asignatura</option>
                 {asignaturas.map((a) => (
                   <option key={a.id} value={a.id}>{a.nombre}</option>
                 ))}
@@ -122,7 +122,7 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea }: Tarea
               <input type="date" className="form-control" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
             <div className="d-flex justify-content-center gap-2 mt-4">
-              <button className="btn btn-primary" onClick={handleGuardar}>
+              <button className="btn btn-primary w-100" onClick={handleGuardar}>
                 {tarea ? 'Guardar cambios' : 'Crear tarea'}
               </button>
               <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>

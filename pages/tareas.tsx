@@ -6,6 +6,8 @@ import TopNav from '@/components/TopNav'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import  Head  from 'next/head'
+import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
 
 type Tarea = {
   id: string
@@ -111,42 +113,33 @@ export default function TareasPage() {
 
   return (
     <>
-      <TopNav
-      title="📝 Tareas"
-      onAddClick={() => {
+      <Head>
+        <title>Tareas</title>
+      </Head>
+      <TopNav title="📝 Tareas" onAddClick={() => {
         setTareaEditando(null)
         setModalVisible(true)
-      } } /> 
-      <div className="container mt-4">
+      }} /> 
+      <div className="container mt-3">
+
         {cargando ? (
+
           <div className="text-center">
             <div className="spinner-border text-primary" role="status" />
           </div>
+
         ) : asignaturas.length === 0 ? (
           <p className="text-white text-center">No tienes tareas aún.</p>
         ) : (
           asignaturas.map((asignatura) => (
-            <div
-              key={asignatura.id}
-              className="mb-4 p-4 rounded text-white"
-              style={{
-                backgroundColor: asignatura.color || '#343a40',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-              }}
-            >
+            <div key={asignatura.id} className="mb-4 p-4 rounded text-white" style={{backgroundColor: asignatura.color || '#343a40', boxShadow: '0 2px 6px rgba(0,0,0,0.3)',}}>
               <h5 className="mb-3">{asignatura.nombre}</h5>
 
               {asignatura.tareas.map((tarea) => (
                 <div key={tarea.id} className="d-flex justify-content-between align-items-start mb-2">
                   <div className="form-check">
-                    <input
-                      className="form-check-input me-2"
-                      type="checkbox"
-                      checked={tarea.completada}
-                      onChange={(e) => cambiarEstado(tarea.id, e.target.checked)} />
-                    <label
-                      className={`form-check-label ${tarea.completada ? 'text-decoration-line-through text-muted' : ''}`}
-                    >
+                    <input className="form-check-input me-2" type="checkbox" checked={tarea.completada} onChange={(e) => cambiarEstado(tarea.id, e.target.checked)} />
+                    <label className={`form-check-label ${tarea.completada ? 'text-decoration-line-through text-muted' : ''}`}>
                       {tarea.titulo}
                     </label>
                     {tarea.fecha_entrega && (
@@ -155,21 +148,15 @@ export default function TareasPage() {
                       </div>
                     )}
                   </div>
-                  <div className="ms-2">
-                    <button
-                      className="btn btn-secondary btn-sm me-2"
-                      onClick={() => {
-                        setTareaEditando(tarea)
-                        setModalVisible(true)
-                      } }
-                    >
-                      <FontAwesomeIcon icon="pencil" size="lg" />
+                  <div className="button-group">
+                    <button className="btn btn-sm btn-outline-light" onClick={() => {
+                      setTareaEditando(tarea)
+                      setModalVisible(true)
+                    }}>
+                      <FontAwesomeIcon icon={faPen} />
                     </button>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => eliminarTarea(tarea.id)}
-                    >
-                      <FontAwesomeIcon icon="trash" size="lg" />
+                    <button className="btn btn-sm btn-outline-danger ms-2"onClick={() => eliminarTarea(tarea.id)}>
+                      <FontAwesomeIcon icon={faTrash} />
                     </button>
                   </div>
                 </div>

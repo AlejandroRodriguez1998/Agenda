@@ -6,6 +6,8 @@ import TopNav from '@/components/TopNav'
 import Swal from 'sweetalert2'
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import  Head  from 'next/head'
+import { faTrash } from '@fortawesome/free-solid-svg-icons'
 
 type Asignatura = {
   id: string
@@ -64,36 +66,29 @@ export default function AsignaturasPage() {
 
   return (
     <>
-      <TopNav 
-      title="📚 Asignaturas" 
-      onAddClick={() => setModalVisible(true)} 
-      />
+      <Head>
+        <title>Asignaturas</title>
+      </Head>
+
+      <TopNav title="📚 Asignaturas" onAddClick={() => setModalVisible(true)} />
+
       <div className="container mt-4">
+
         {cargando ? (
+          
           <div className="text-center mt-4">
             <div className="spinner-border text-primary" role="status" />
           </div>
+
         ) : asignaturas.length === 0 ? (
           <p className="text-white text-center mt-4">No tienes asignaturas.</p>
         ) : (
-          <ul className="list-group mt-4">
+          <ul className="list-group">
             {asignaturas.map((a) => (
-              <li
-                key={a.id}
-                className="list-group-item d-flex justify-content-between align-items-center text-white mb-3"
-                style={{
-                  backgroundColor: a.color || '#343a40',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '0.75rem 1rem',
-                }}
-              >
+              <li key={a.id} className="list-group-item d-flex justify-content-between align-items-center text-white mb-3" style={{ backgroundColor: a.color || '#343a40', border: 'none', borderRadius: '8px', padding: '0.75rem 1rem',}}>
                 <span className="fw-semibold">{a.nombre}</span>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => eliminarAsignatura(a.id)}
-                >
-                  <FontAwesomeIcon icon="trash" size="lg" />
+                <button className="btn btn-sm btn-outline-danger" onClick={() => eliminarAsignatura(a.id)}>
+                  <FontAwesomeIcon icon={faTrash} />
                 </button>
               </li>
             ))}

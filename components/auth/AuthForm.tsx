@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import styles from './AuthForm.module.css'
 import toast from 'react-hot-toast'
+import  Head  from 'next/head'
 
 export default function AuthForm() {
   const [email, setEmail] = useState('')
@@ -55,56 +56,33 @@ export default function AuthForm() {
   }
 
   return (
+    <><Head>
+      <title>{isLogin ? 'Iniciar Sesión' : 'Registrarse'}</title>
+    </Head>
+
     <div className={styles.wrapper}>
-      <form className={styles.form} onSubmit={handleSubmit}>
-        <div className={styles.title}>
-          {isLogin ? 'Bienvenido de nuevo,' : 'Bienvenido,'}
-          <br />
-          <span>{isLogin ? 'inicia sesión para continuar' : 'registrarse para continuar'}</span>
-        </div>
+        <form className={styles.form} onSubmit={handleSubmit}>
+          <div className={styles.title}>
+            {isLogin ? 'Bienvenido de nuevo,' : 'Bienvenido,'}
+            <br />
+            <span>{isLogin ? 'inicia sesión para continuar' : 'registrarse para continuar'}</span>
+          </div>
 
-        <input
-          className={styles.input}
-          type="email"
-          name="email"
-          placeholder="Correo electrónico"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+          <input className={styles.input} type="email" name="email" placeholder="Correo electrónico" value={email} onChange={(e) => setEmail(e.target.value)} required />
 
-        <input
-          className={styles.input}
-          type="password"
-          name="password"
-          placeholder="Contraseña"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+          <input className={styles.input} type="password" name="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required />
 
-        <button type="submit" className={styles['button-confirm']}>
-          {isLogin ? 'Acceder' : 'Registrarse'} →
-        </button>
-
-        <p style={{ fontSize: '0.9rem', marginTop: '10px', color: 'black' }}>
-          {isLogin ? '¿No tienes cuenta?' : '¿Tienes una cuenta?'}{' '}
-          <button
-            type="button"
-            onClick={() => setIsLogin(!isLogin)}
-            style={{
-              color: 'blue',
-              background: 'none',
-              border: 'none',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-            }}
-          >
-            {isLogin ? 'Registrarse' : 'Iniciar Sesión'}
+          <button type="submit" className={styles['button-confirm']}>
+            {isLogin ? 'Acceder' : 'Registrarse'} →
           </button>
-        </p>
-      </form>
-    </div>
+
+          <p style={{ fontSize: '0.9rem', marginTop: '10px', color: 'black' }}>
+            {isLogin ? '¿No tienes cuenta?' : '¿Tienes una cuenta?'}{' '}
+            <button type="button" onClick={() => setIsLogin(!isLogin)} style={{color: 'blue',background: 'none',border: 'none',textDecoration: 'underline',cursor: 'pointer',fontWeight: 'bold',}}>
+              {isLogin ? 'Registrarse' : 'Iniciar Sesión'}
+            </button>
+          </p>
+        </form>
+      </div></>
   )
 }
