@@ -1,4 +1,14 @@
+* {
+  touch-action: manipulation;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
 html, body {
+  touch-action: manipulation; /* evita zoom por doble tap o gesto */
+  overscroll-behavior-x: none; /* evita desplazamiento horizontal extra */
+  overflow-x: hidden; /* oculta scroll horizontal */
+  -webkit-tap-highlight-color: transparent; /* quita parpadeo al tocar */
   margin: 0;
   padding: 0;
   background-color: #352f2f;   /* 🖤 fondo negro */
@@ -59,3 +69,106 @@ html, body {
   font-size: 1.2rem;
   white-space: nowrap;
 }
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border: none !important;
+}
+
+.fc-theme-standard .fc-scrollgrid {
+  border: none !important;
+}
+
+/* ✅ Centra los números del día */
+.fc .fc-daygrid-day-number {
+  text-align: center;
+  width: 100%;
+  display: inline-block;
+  font-weight: 500;
+  color: white;
+}
+
+/* 💠 Aumenta el espaciado entre días */
+.fc .fc-daygrid-day-frame {
+  padding: 10px 0;
+}
+
+/* Cabecera de los días de la semana */
+.fc .fc-scrollgrid-section-sticky > * {
+  background-color: transparent !important;  /* ❌ Elimina fondo blanco */
+  text-transform: capitalize;               /* ✅ Primera letra mayúscula */
+  color: white !important;                  /* ✅ Letras blancas */
+  font-weight: bold;                        /* ✅ Negrita */
+  text-decoration: none !important;         /* ❌ Sin subrayado */
+  border: none !important;                  /* ❌ Elimina bordes si los hubiera */
+}
+
+/* Enlaces (el <a> que envuelve cada día) */
+.fc .fc-col-header-cell a {
+  color: white !important;
+  text-decoration: none !important;
+  pointer-events: none; /* Opcional: evita que se comporten como enlaces */
+}
+
+/* Aplica solo en móvil */
+@media (max-width: 767.98px) {
+  .fc-daygrid-day-events  {
+    display: none;
+  }
+
+  .fc .fc-daygrid-day-number {
+    display: block;
+    text-align: center;
+    color: white;
+  }
+
+  .fc .fc-daygrid-day-frame {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px;
+  }
+
+  .fc .calendar-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-top: 2px;
+  }
+
+  .fc .calendar-dot-container {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+    margin-top: 2px;
+  }
+
+  .fc .fc-daygrid-day-frame {
+    padding: 6px 0;
+  }
+
+  .fc .fc-daygrid-day-number {
+    font-size: 0.85rem;
+  }
+
+  .fc .fc-scrollgrid {
+    font-size: 0.8rem;
+  }
+
+  /* Tamaño general del calendario más pequeño */
+  .fc {
+    font-size: 0.85rem;
+  }
+}
+
+/* Oculta los puntitos en pantallas grandes */
+@media (min-width: 768px) {
+  .calendar-dot-container {
+    display: none !important;
+  }
+
+  .fc-daygrid-day-events  {
+    display: block;
+  }
+}
+
