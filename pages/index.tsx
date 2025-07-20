@@ -52,7 +52,7 @@ export default function InicioPage() {
       ) : (
         <div style={{ minHeight: '100vh', color: 'white' }}>
           {/* HERO */}
-          <div className="container py-5 d-flex flex-column justify-content-center align-items-center text-center">
+          <div className="container pb-5 d-flex flex-column justify-content-center align-items-center text-center">
             <h1 className="display-4 mb-3">👋 Bienvenido a tu Agenda Escolar</h1>
             <p className="lead mb-4">
               Organiza fácilmente tus tareas, exámenes y asignaturas desde un solo lugar.

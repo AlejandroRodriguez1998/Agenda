@@ -31,7 +31,7 @@ export default function AuthForm() {
       return
     }
 
-    toast.success(isLogin ? 'Sesión iniciada' : 'Registro completado', {
+    toast.success(isLogin ? 'Bienvenido! 👋' : 'Registro completado', {
       style: {
         background: '#1a1a1a',
         color: '#fff',

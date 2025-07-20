@@ -1,7 +1,14 @@
 * {
   touch-action: manipulation;
   box-sizing: border-box;
+}
+
+img,
+video,
+iframe {
   max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 html, body {
@@ -41,6 +48,8 @@ html, body {
 .fc {
   border-radius: 6px;
   color: white;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .fc .fc-daygrid-day-number {
