@@ -72,7 +72,7 @@ export default function AsignaturasPage() {
 
       <TopNav title="📚 Asignaturas" onAddClick={() => setModalVisible(true)} />
 
-      <div className="container mt-4 mb-5">
+      <div className="container mt-4 mb-5 pb-5">
 
         {cargando ? (
           
