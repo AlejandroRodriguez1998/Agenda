@@ -27,6 +27,12 @@ export default function ModalUsuario() {
   }
 
   const borrarCuenta = async () => {
+
+    /*  <div className="d-flex justify-content-start mt-5 mb-3">
+                            <button className="btn btn-danger" onClick={borrarCuenta}>Borrar cuenta</button>
+                        </div>
+    */
+
     const confirmar = await Swal.fire({
       title: '¿Estás seguro?',
       text: 'Esta acción eliminará tu cuenta permanentemente',
@@ -119,9 +125,6 @@ export default function ModalUsuario() {
 
                         <button className="btn btn-primary w-100 mb-2" onClick={cambiarContraseña}>Cambiar contraseña</button>
 
-                        <div className="d-flex justify-content-start mt-5 mb-3">
-                            <button className="btn btn-danger" onClick={borrarCuenta}>Borrar cuenta</button>
-                        </div>
                     </div>
                 </div>
             </div>

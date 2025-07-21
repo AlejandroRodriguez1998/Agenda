@@ -30,8 +30,6 @@ export default function VerificarPage() {
         const result = await supabase.auth.exchangeCodeForSession(authCode)
         error = result.error
 
-        // ❗ Cierra sesión inmediatamente tras verificar
-        await supabase.auth.signOut()
       } else {
         error = { message: 'No se encontró el código de verificación en la URL.' }
       }
@@ -54,14 +52,6 @@ export default function VerificarPage() {
           <>
             <h1 className="mb-3">🔄 Verificando cuenta...</h1>
             <p>Estamos confirmando tu correo electrónico.</p>
-          </>
-        )}
-
-        {estado === 'ok' && (
-          <>
-            <h1 className="mb-3">✅ ¡Cuenta verificada!</h1>
-            <p className="mb-4">Tu correo ha sido confirmado correctamente. Ya puedes iniciar sesión.</p>
-            <Link href="/login" className="btn btn-primary">Ir a iniciar sesión</Link>
           </>
         )}
 
