@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient'
 import styles from './AuthForm.module.css'
 import toast from 'react-hot-toast'
 import  Head  from 'next/head'
+import Swal from 'sweetalert2'
 
 export default function AuthForm() {
   const [email, setEmail] = useState('')
@@ -16,7 +17,7 @@ export default function AuthForm() {
 
     const action = isLogin
       ? supabase.auth.signInWithPassword({ email, password })
-      : supabase.auth.signUp({ email, password })
+      : supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/verificar` } })
 
     const { error } = await action
 
@@ -31,14 +32,24 @@ export default function AuthForm() {
       return
     }
 
-    toast.success(isLogin ? 'Bienvenido! 👋' : 'Registro completado', {
-      style: {
+    if (isLogin) {
+      toast.success('¡Bienvenido! 👋', {
+        style: {
+          background: '#1a1a1a',
+          color: '#fff',
+        },
+      })
+      router.push('/')
+    } else {
+      await Swal.fire({
+        icon: 'success',
+        title: '¡Registro completado!',
+        text: 'Hemos enviado un correo a tu dirección para que verifiques tu cuenta.',
+        confirmButtonText: 'Entendido',
         background: '#1a1a1a',
         color: '#fff',
-      },
-    })
-
-    router.push('/')
+      })
+    }
   }
 
   function traducirError(mensaje: string): string {
