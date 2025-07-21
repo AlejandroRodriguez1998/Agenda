@@ -120,7 +120,7 @@ export default function TareasPage() {
         setTareaEditando(null)
         setModalVisible(true)
       }} /> 
-      <div className="container mt-3">
+      <div className="container mt-3 mb-5 pb-1">
 
         {cargando ? (
 

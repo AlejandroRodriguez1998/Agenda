@@ -131,7 +131,7 @@ export default function NotasPage() {
       </Head>
       <TopNav title="📊 Notas" showAdd={!!seleccionada} onAddClick={() => setModalVisible(true)}/>
 
-      <div className="container mt-3">
+      <div className="container mt-3 mb-5 pb-1">
         <div className="mb-4">
           <select className="form-select" onChange={(e) => {
             setSeleccionada(e.target.value)
