@@ -118,9 +118,16 @@ export default function CalendarioUsuario({ userId }: { userId: string }) {
                   )
                 }}
                 headerToolbar={{
-                  left: 'prev,next',
+                  left: 'prev',
                   center: 'title',
-                  right: 'today'
+                  right: 'next'
+                }}
+                titleFormat={(date) => {
+                  const jsDate = date.date.marker as Date;
+                  const mes = jsDate.toLocaleString('es-ES', { month: 'long' });
+                  const año = jsDate.getFullYear();
+                  const mesCapitalizado = mes.charAt(0).toUpperCase() + mes.slice(1);
+                  return `${mesCapitalizado} ${año}`;
                 }}
               />
             </div>
