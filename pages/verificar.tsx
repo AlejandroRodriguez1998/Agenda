@@ -3,14 +3,25 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import Head from 'next/head'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 
 export default function VerificarPage() {
+  const router = useRouter()
   const [verificando, setVerificando] = useState(true)
   const [estado, setEstado] = useState<'ok' | 'error' | null>(null)
 
   useEffect(() => {
+    const comprobarSesion = async () => {
+      const { data } = await supabase.auth.getSession()
+      if (data.session?.user) {
+        router.replace('/')
+        return
+      }
+
+      verificar()
+    }
+
     const verificar = async () => {
-      // Obtener el código de la URL
       const url = new URL(window.location.href)
       const authCode = url.searchParams.get('code')
 
@@ -18,20 +29,19 @@ export default function VerificarPage() {
       if (authCode) {
         const result = await supabase.auth.exchangeCodeForSession(authCode)
         error = result.error
+
+        // ❗ Cierra sesión inmediatamente tras verificar
+        await supabase.auth.signOut()
       } else {
         error = { message: 'No se encontró el código de verificación en la URL.' }
       }
-      setVerificando(false)
 
-      if (error) {
-        setEstado('error')
-      } else {
-        setEstado('ok')
-      }
+      setVerificando(false)
+      setEstado(error ? 'error' : 'ok')
     }
 
-    verificar()
-  }, [])
+    comprobarSesion()
+  }, [router])
 
   return (
     <>
