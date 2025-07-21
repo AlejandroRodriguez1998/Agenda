@@ -22,7 +22,8 @@ export default function ModalUsuario() {
 
   const cerrarSesion = async () => {
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    localStorage.setItem('showLogoutToast', 'true')
+    window.location.href = '/'
   }
 
   const borrarCuenta = async () => {

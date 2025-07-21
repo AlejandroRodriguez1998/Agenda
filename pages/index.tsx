@@ -7,16 +7,10 @@ import Link from 'next/link'
 import Head from 'next/head'
 import CalendarioUsuario from '@/components/CalendarioUsuario'
 
-type Evento = {
-  id: string
-  title: string
-  start: string
-  color: string
-}
-
 export default function InicioPage() {
   const router = useRouter()
   const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null)
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
     if (localStorage.getItem('showLogoutToast') === 'true') {
@@ -28,8 +22,9 @@ export default function InicioPage() {
 
     const obtenerUsuario = async () => {
       const { data } = await supabase.auth.getSession()
-      const user = data.session?.user
-      setUser(user ?? null)
+      const usuario = data.session?.user
+      setUser(usuario ?? null)
+      setCargando(false)
     }
 
     obtenerUsuario()
@@ -41,14 +36,23 @@ export default function InicioPage() {
         <title>Agenda Escolar</title>
       </Head>
 
-      {user && <TopNav title="🏠 Inicio" customRightIcon="logout" onRightClick={async () => {
-        await supabase.auth.signOut()
-        localStorage.setItem('showLogoutToast', 'true')
-        router.push('/').then(() => router.reload())
-      }} />}
-
-      {user ? (
-        <CalendarioUsuario userId={user.id} />
+      {cargando ? (
+        <div className="d-flex justify-content-center align-items-center vh-100">
+          <div className="spinner-border text-primary" role="status" />
+        </div>
+      ) : user ? (
+        <>
+          <TopNav
+            title="🏠 Inicio"
+            customRightIcon="logout"
+            onRightClick={async () => {
+              await supabase.auth.signOut()
+              localStorage.setItem('showLogoutToast', 'true')
+              router.push('/').then(() => router.reload())
+            }}
+          />
+          <CalendarioUsuario userId={user.id} />
+        </>
       ) : (
         <div style={{ minHeight: '100vh', color: 'white' }}>
           {/* HERO */}
@@ -67,26 +71,20 @@ export default function InicioPage() {
             <div className="row g-4">
               <div className="col-md-4">
                 <div className="bg-dark text-white rounded p-4 h-100 shadow">
-
                   <h4>📝 Gestiona tus tareas</h4>
                   <p className="mt-2">Añade, marca como completadas y organiza tus tareas por asignatura.</p>
-
                 </div>
               </div>
               <div className="col-md-4">
                 <div className="bg-dark text-white rounded p-4 h-100 shadow">
-
                   <h4>📚 Organiza tus asignaturas</h4>
                   <p className="mt-2">Crea asignaturas y asigna colores para identificarlas rápidamente.</p>
-
                 </div>
               </div>
               <div className="col-md-4">
                 <div className="bg-dark text-white rounded p-4 h-100 shadow">
-
                   <h4>📊 Calcula tus notas</h4>
                   <p className="mt-2">Introduce tus calificaciones, pesos y visualiza tu media global.</p>
-
                 </div>
               </div>
             </div>
@@ -94,7 +92,9 @@ export default function InicioPage() {
 
           {/* CIERRE */}
           <div className="text-center pb-5">
-            <p className="text-white-50 fst-italic">✨ Empieza ahora a tener tu vida académica bajo control. ¡Tu yo del futuro te lo agradecerá!</p>
+            <p className="text-white-50 fst-italic">
+              ✨ Empieza ahora a tener tu vida académica bajo control. ¡Tu yo del futuro te lo agradecerá!
+            </p>
           </div>
         </div>
       )}
