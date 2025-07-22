@@ -4,15 +4,15 @@ import { supabase } from '@/lib/supabaseClient'
 import ModalAsignatura from '@/components/ModalAsignatura'
 import TopNav from '@/components/TopNav'
 import Swal from 'sweetalert2'
-
+import Head from 'next/head'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import  Head  from 'next/head'
 import { faTrash } from '@fortawesome/free-solid-svg-icons'
 
 type Asignatura = {
   id: string
   nombre: string
   color?: string
+  curso: string
 }
 
 export default function AsignaturasPage() {
@@ -40,7 +40,8 @@ export default function AsignaturasPage() {
     const { data } = await supabase
       .from('asignaturas')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('curso', { ascending: true })
+      .order('nombre', { ascending: true })
 
     if (data) setAsignaturas(data)
     setCargando(false)
@@ -64,6 +65,12 @@ export default function AsignaturasPage() {
     }
   }
 
+  const asignaturasPorCurso = asignaturas.reduce((acc, a) => {
+    if (!acc[a.curso]) acc[a.curso] = []
+    acc[a.curso].push(a)
+    return acc
+  }, {} as Record<string, Asignatura[]>)
+
   return (
     <>
       <Head>
@@ -73,32 +80,47 @@ export default function AsignaturasPage() {
       <TopNav title="📚 Asignaturas" onAddClick={() => setModalVisible(true)} />
 
       <div className="container mt-4 mb-5 pb-5">
-
         {cargando ? (
-          
           <div className="text-center mt-4">
             <div className="spinner-border text-primary" role="status" />
           </div>
-
-        ) : asignaturas.length === 0 ? (
+        ) : Object.keys(asignaturasPorCurso).length === 0 ? (
           <p className="text-white text-center mt-4">No tienes asignaturas.</p>
         ) : (
-          <ul className="list-group">
-            {asignaturas.map((a) => (
-              <li key={a.id} className="list-group-item d-flex justify-content-between align-items-center text-white mb-3" style={{ backgroundColor: a.color || '#343a40', border: 'none', borderRadius: '8px', padding: '0.75rem 1rem',}}>
-                <span className="fw-semibold">{a.nombre}</span>
-                <button className="btn btn-sm btn-outline-danger" onClick={() => eliminarAsignatura(a.id)}>
-                  <FontAwesomeIcon icon={faTrash} />
-                </button>
-              </li>
-            ))}
-          </ul>
+          Object.entries(asignaturasPorCurso).map(([curso, lista]) => (
+            <div key={curso} className="mb-4">
+              <h5 className="text-white fw-bold mb-3">{curso}ª curso</h5>
+              <ul className="list-group">
+                {lista.map((a) => (
+                  <li
+                    key={a.id}
+                    className="list-group-item d-flex justify-content-between align-items-center text-white mb-2"
+                    style={{
+                      backgroundColor: a.color || '#343a40',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.75rem 1rem',
+                    }}
+                  >
+                    <span className="fw-semibold">{a.nombre}</span>
+                    <button
+                      className="btn btn-sm btn-outline-light"
+                      onClick={() => eliminarAsignatura(a.id)}
+                    >
+                      <FontAwesomeIcon icon={faTrash} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
         )}
 
         <ModalAsignatura
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
-          onSuccess={cargarAsignaturas} />
+          onSuccess={cargarAsignaturas}
+        />
       </div>
     </>
   )

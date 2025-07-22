@@ -5,13 +5,14 @@ import TopNav from '@/components/TopNav'
 import ModalNota from '@/components/ModalNota'
 import Swal from 'sweetalert2'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import  Head  from 'next/head'
+import Head from 'next/head'
 import { faTrash } from '@fortawesome/free-solid-svg-icons'
 
 type Asignatura = {
   id: string
   nombre: string
   color: string
+  curso: string
 }
 
 type Nota = {
@@ -51,6 +52,7 @@ export default function NotasPage() {
     const { data: asignaturasData } = await supabase
       .from('asignaturas')
       .select('*')
+      .order('curso', { ascending: true })
       .order('nombre', { ascending: true })
 
     const { data: notasData } = await supabase
@@ -60,6 +62,7 @@ export default function NotasPage() {
 
     if (asignaturasData && notasData) {
       setAsignaturas(asignaturasData)
+
       const agrupadas = asignaturasData.reduce((acc, asignatura) => {
         acc[asignatura.id] = notasData.filter(n => n.asignatura_id === asignatura.id)
         return acc
@@ -119,17 +122,30 @@ export default function NotasPage() {
     }
   }).filter(n => n.final > 0)
 
+  const notasPorCurso = notasFinales.reduce((acc, nota) => {
+    const curso = nota.asignatura.curso
+    if (!acc[curso]) acc[curso] = []
+    acc[curso].push(nota)
+    return acc
+  }, {} as Record<string, { asignatura: Asignatura; final: number }[]>)
+
   const mediaGlobal =
     notasFinales.length > 0
       ? (notasFinales.reduce((acc, n) => acc + n.final, 0) / notasFinales.length).toFixed(2)
       : null
+
+  const asignaturasPorCurso = asignaturas.reduce((acc, a) => {
+    if (!acc[a.curso]) acc[a.curso] = []
+    acc[a.curso].push(a)
+    return acc
+  }, {} as Record<string, Asignatura[]>)
 
   return (
     <>
       <Head>
         <title>Notas</title>
       </Head>
-      <TopNav title="📊 Notas" showAdd={!!seleccionada} onAddClick={() => setModalVisible(true)}/>
+      <TopNav title="📊 Notas" showAdd={!!seleccionada} onAddClick={() => setModalVisible(true)} />
 
       <div className="container mt-3 mb-5 pb-5">
         <div className="mb-4">
@@ -138,10 +154,14 @@ export default function NotasPage() {
             if (e.target.value) cargarNotas(e.target.value)
           }} value={seleccionada || ''}>
             <option value="">Selecciona una asignatura</option>
-            {asignaturas.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nombre}
-              </option>
+            {Object.entries(asignaturasPorCurso).map(([curso, lista]) => (
+              <optgroup key={curso} label={`${curso}ª curso`}>
+                {lista.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>
@@ -154,7 +174,7 @@ export default function NotasPage() {
           <>
             {mediaGlobal ? (
               <div className="text-center mb-4">
-                <div style={{width: 120, height: 120, borderRadius: '50%', backgroundColor: '#0d6efd', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 28, fontWeight: 'bold', margin: '0 auto 1rem',}}>
+                <div style={{ width: 120, height: 120, borderRadius: '50%', backgroundColor: '#0d6efd', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 28, fontWeight: 'bold', margin: '0 auto 1rem' }}>
                   {mediaGlobal}
                 </div>
                 <p className="text-white">Media global de todas las asignaturas</p>
@@ -163,12 +183,23 @@ export default function NotasPage() {
               <p className="text-white text-center">No hay notas aún.</p>
             )}
 
-            {notasFinales.map(({ asignatura, final }) => (
-              <div key={asignatura.id} className="d-flex justify-content-between align-items-center mb-2 text-white p-3 rounded" style={{ backgroundColor: asignatura.color || '#343a40' }}>
-                <strong>{asignatura.nombre}</strong>
-                <span className="badge bg-light text-dark">{final.toFixed(2)}</span>
-              </div>
-            ))}
+            {Object.entries(notasPorCurso)
+              .sort((a, b) => Number(a[0]) - Number(b[0])) // Ordenar cursos numéricamente
+              .map(([curso, lista]) => (
+                <div key={curso} className="mb-3">
+                  <h5 className="text-white fw-bold mb-2">{curso}ª curso</h5>
+                  {lista.map(({ asignatura, final }) => (
+                    <div
+                      key={asignatura.id}
+                      className="d-flex justify-content-between align-items-center mb-2 text-white p-3 rounded"
+                      style={{ backgroundColor: asignatura.color || '#343a40' }}
+                    >
+                      <strong>{asignatura.nombre}</strong>
+                      <span className="badge bg-light text-dark">{final.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
           </>
         ) : (
           <>

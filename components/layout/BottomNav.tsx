@@ -69,17 +69,17 @@ export default function BottomNav() {
         </div>
       </Link>
 
-      <Link href="/asignaturas" style={router.pathname === '/asignaturas' ? { ...linkStyle, ...activeStyle } : linkStyle}>
-        <div className="text-center">
-          <FontAwesomeIcon icon="book" size="lg" />
-          <div>Asignaturas</div>
-        </div>
-      </Link>
-
       <Link href="/notas" style={router.pathname === '/notas' ? { ...linkStyle, ...activeStyle } : linkStyle}>
         <div className="text-center">
           <FontAwesomeIcon icon="chart-column" size="lg" />
           <div>Notas</div>
+        </div>
+      </Link>
+
+      <Link href="/asignaturas" style={router.pathname === '/asignaturas' ? { ...linkStyle, ...activeStyle } : linkStyle}>
+        <div className="text-center">
+          <FontAwesomeIcon icon="book" size="lg" />
+          <div>Asignaturas</div>
         </div>
       </Link>
     </nav>

@@ -155,7 +155,7 @@ export default function TareasPage() {
                     }}>
                       <FontAwesomeIcon icon={faPen} />
                     </button>
-                    <button className="btn btn-sm btn-outline-danger ms-2"onClick={() => eliminarTarea(tarea.id)}>
+                    <button className="btn btn-sm btn-outline-light ms-1" onClick={() => eliminarTarea(tarea.id)}>
                       <FontAwesomeIcon icon={faTrash} />
                     </button>
                   </div>

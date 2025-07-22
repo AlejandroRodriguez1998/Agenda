@@ -14,8 +14,14 @@ type TareaModalProps = {
   }
 }
 
+type Asignatura = {
+  id: string
+  nombre: string
+  curso: string
+}
+
 export default function ModalTarea({ visible, onClose, onSuccess, tarea }: TareaModalProps) {
-  const [asignaturas, setAsignaturas] = useState<{ id: string; nombre: string }[]>([])
+  const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
   const [asignaturaId, setAsignaturaId] = useState(tarea?.asignatura_id || '')
   const [titulo, setTitulo] = useState(tarea?.titulo || '')
   const [fecha, setFecha] = useState(tarea?.fecha_entrega || '')
@@ -23,7 +29,9 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea }: Tarea
   useEffect(() => {
     supabase
       .from('asignaturas')
-      .select('id, nombre')
+      .select('id, nombre, curso')
+      .order('curso')
+      .order('nombre')
       .then(({ data }) => {
         if (data) setAsignaturas(data)
       })
@@ -54,12 +62,14 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea }: Tarea
 
     const { data: session } = await supabase.auth.getSession()
     const userId = session.session?.user?.id
-    if (!userId) return toast.error('No hay sesión activa', {
+    if (!userId) {
+      return toast.error('No hay sesión activa', {
         style: {
           background: '#1a1a1a',
           color: '#fff',
         },
       })
+    }
 
     const payload = {
       titulo: titulo.trim(),
@@ -96,6 +106,15 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea }: Tarea
 
   if (!visible) return null
 
+  console.log('ModalTarea renderizado', { asignaturas })
+
+  // Agrupamos por curso
+  const asignaturasPorCurso = asignaturas.reduce((acc, a) => {
+    if (!acc[a.curso]) acc[a.curso] = []
+    acc[a.curso].push(a)
+    return acc
+  }, {} as Record<string, Asignatura[]>)
+
   return (
     <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
       <div className="modal-dialog modal-dialog modal-dialog-centered">
@@ -104,30 +123,54 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea }: Tarea
             <div className="text-center">
               <h3 className="mb-0">{tarea ? 'Editar Tarea' : 'Nueva Tarea'}</h3>
             </div>
+
             <div className="mb-3">
               <label className="form-label">Nombre</label>
-              <input className="form-control" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+              <input
+                className="form-control"
+                value={titulo}
+                onChange={(e) => setTitulo(e.target.value)}
+              />
             </div>
+
             <div className="mb-3">
               <label className="form-label">Asignatura</label>
-              <select className="form-select" value={asignaturaId} onChange={(e) => setAsignaturaId(e.target.value)}>
+              <select
+                className="form-select"
+                value={asignaturaId}
+                onChange={(e) => setAsignaturaId(e.target.value)}
+              >
                 <option value="">Selecciona una asignatura</option>
-                {asignaturas.map((a) => (
-                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                {Object.entries(asignaturasPorCurso).map(([curso, lista]) => (
+                  <optgroup key={curso} label={`${curso}ª curso`}>
+                    {lista.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.nombre}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
+
             <div className="mb-3">
               <label className="form-label">Fecha de entrega</label>
-              <input type="date" className="form-control" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              <input
+                type="date"
+                className="form-control"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+              />
             </div>
+
             <div className="d-flex justify-content-center gap-2 mt-4">
               <button className="btn btn-primary w-100" onClick={handleGuardar}>
                 {tarea ? 'Guardar cambios' : 'Crear tarea'}
               </button>
-              <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+              <button className="btn btn-secondary" onClick={onClose}>
+                Cancelar
+              </button>
             </div>
-            
           </div>
         </div>
       </div>
