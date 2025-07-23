@@ -1,82 +1,83 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { setupPushNotifications } from '@/lib/setupPush'
+import { useRouter } from 'next/router'
 
-export default function HorariosPage() {
+export default function CrearHorario() {
+  const [titulo, setTitulo] = useState('')
+  const [fechaLocal, setFechaLocal] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
-  const [token, setToken] = useState<string | null>(null)
-  const [enviando, setEnviando] = useState(false)
+  const [mensaje, setMensaje] = useState('')
+  const router = useRouter()
 
   useEffect(() => {
-    const obtenerUsuario = async () => {
-      if (typeof window === 'undefined' || !('Notification' in window)) return
-
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData.session?.access_token || null
-
-      const { data: userData } = await supabase.auth.getUser()
-      const uid = userData.user?.id || null
-
-      console.log('🔐 Usuario ID:', uid)
-      console.log('🔑 Access token:', accessToken)
-
-      if (accessToken && uid) {
-        setToken(accessToken)
-        setUserId(uid)
-        await setupPushNotifications(uid)
+    supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user
+      if (user) {
+        setUserId(user.id)
+      } else {
+        router.push('/login')
       }
-    }
-
-    obtenerUsuario()
+    })
   }, [])
 
-  const enviarNotificacion = async () => {
-    if (!userId) {
-      alert('Usuario no identificado')
+  const crearHorario = async () => {
+    if (!titulo || !fechaLocal || !userId) {
+      setMensaje('Rellena todos los campos')
       return
     }
 
-    setEnviando(true)
+    // Convertir la fecha local del input a UTC ISO string
+    const localDate = new Date(fechaLocal)
+    const fechaUTC = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000).toISOString()
 
-    const payload = {
-      userId,
-      title: '📚 ¡Prueba de notificación!',
-      body: 'Esto es una notificación de ejemplo para los horarios.',
+    const { error } = await supabase.from('horario').insert([
+      {
+        user_id: userId,
+        titulo,
+        descripcion: '',
+        fecha: fechaUTC,
+      },
+    ])
+
+    if (error) {
+      console.error('Error al crear horario:', error)
+      setMensaje('❌ Error al crear horario')
+    } else {
+      setMensaje('✅ Horario creado correctamente')
+      setTitulo('')
+      setFechaLocal('')
     }
-
-    console.log('📦 Enviando payload:', payload)
-
-    try {
-      const res = await fetch('https://tfnbyjiuoklehdaorlsi.supabase.co/functions/v1/notificar', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify(payload),
-      })
-
-      const msg = await res.text()
-
-      if (res.ok) {
-        alert('✅ Notificación enviada correctamente')
-      } else {
-        alert('❌ Error: ' + msg)
-      }
-    } catch (error) {
-      alert('❌ Error al enviar la notificación: ' + (error instanceof Error ? error.message : String(error)))
-    }
-
-    setEnviando(false)
   }
 
   return (
-    <div className="container mt-5">
-      <h2>Horarios</h2>
-      <p>Haz clic en el botón para enviar una notificación de prueba.</p>
-      <button className="btn btn-primary" onClick={enviarNotificacion} disabled={enviando}>
-        {enviando ? 'Enviando...' : 'Enviar notificación'}
+    <div style={{ maxWidth: 500, margin: '2rem auto', padding: 20 }}>
+      <h2>Crear nuevo horario</h2>
+
+      <div className="mb-3">
+        <label className="form-label">Título</label>
+        <input
+          type="text"
+          className="form-control"
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value)}
+        />
+      </div>
+
+      <div className="mb-3">
+        <label className="form-label">Fecha y hora</label>
+        <input
+          type="datetime-local"
+          className="form-control"
+          value={fechaLocal}
+          onChange={(e) => setFechaLocal(e.target.value)}
+        />
+      </div>
+
+      <button className="btn btn-primary" onClick={crearHorario}>
+        Guardar horario
       </button>
+
+      {mensaje && <div className="mt-3 alert alert-info">{mensaje}</div>}
     </div>
   )
 }
