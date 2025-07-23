@@ -2,7 +2,7 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 import '@/styles/globals.css'
 import '@/lib/fontawesome'
 import type { AppProps } from 'next/app'
-import BottomNav from '@/components/layout/BottomNav'
+import BottomNav from '@/components/BottomNav'
 import { Toaster } from 'react-hot-toast'
 import { useEffect, useState } from 'react'
 
