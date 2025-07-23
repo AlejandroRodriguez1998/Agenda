@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { setupPushNotifications } from '@/lib/setupPush' // asegúrate de tener esto creado
+import { setupPushNotifications } from '@/lib/setupPush'
 
 export default function HorariosPage() {
   const [userId, setUserId] = useState<string | null>(null)
@@ -9,8 +9,12 @@ export default function HorariosPage() {
 
   useEffect(() => {
     const obtenerUsuario = async () => {
+      // Aseguramos que solo se ejecuta en el navegador
+      if (typeof window === 'undefined' || !('Notification' in window)) return
+
       const { data: sessionData } = await supabase.auth.getSession()
       const accessToken = sessionData.session?.access_token || null
+
       const { data: userData } = await supabase.auth.getUser()
       const uid = userData.user?.id || null
 
@@ -18,7 +22,7 @@ export default function HorariosPage() {
         setToken(accessToken)
         setUserId(uid)
 
-        // Pedimos permiso y guardamos token push en supabase
+        // Pedimos permiso y guardamos token push en Supabase
         await setupPushNotifications(uid)
       }
     }
@@ -30,11 +34,11 @@ export default function HorariosPage() {
     if (!userId) return alert('Usuario no identificado')
     setEnviando(true)
 
-    const res = await fetch('https://<TU_PROYECTO>.functions.supabase.co/notificar', {
+    const res = await fetch('https://tfnbyjiuoklehdaorlsi.supabase.co/functions/v1/notificar', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }), // solo si no es pública
+        ...(token && { Authorization: `Bearer ${token}` }), // si tu función no es pública
       },
       body: JSON.stringify({
         userId,
