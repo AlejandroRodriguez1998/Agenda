@@ -9,7 +9,6 @@ export default function HorariosPage() {
 
   useEffect(() => {
     const obtenerUsuario = async () => {
-      // Aseguramos que solo se ejecuta en el navegador
       if (typeof window === 'undefined' || !('Notification' in window)) return
 
       const { data: sessionData } = await supabase.auth.getSession()
@@ -18,11 +17,12 @@ export default function HorariosPage() {
       const { data: userData } = await supabase.auth.getUser()
       const uid = userData.user?.id || null
 
+      console.log('🔐 Usuario ID:', uid)
+      console.log('🔑 Access token:', accessToken)
+
       if (accessToken && uid) {
         setToken(accessToken)
         setUserId(uid)
-
-        // Pedimos permiso y guardamos token push en Supabase
         await setupPushNotifications(uid)
       }
     }
@@ -31,27 +31,40 @@ export default function HorariosPage() {
   }, [])
 
   const enviarNotificacion = async () => {
-    if (!userId) return alert('Usuario no identificado')
+    if (!userId) {
+      alert('Usuario no identificado')
+      return
+    }
+
     setEnviando(true)
 
-    const res = await fetch('https://tfnbyjiuoklehdaorlsi.supabase.co/functions/v1/notificar', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }), // si tu función no es pública
-      },
-      body: JSON.stringify({
-        userId,
-        title: '📚 ¡Prueba de notificación!',
-        body: 'Esto es una notificación de ejemplo para los horarios.',
-      }),
-    })
+    const payload = {
+      userId,
+      title: '📚 ¡Prueba de notificación!',
+      body: 'Esto es una notificación de ejemplo para los horarios.',
+    }
 
-    if (res.ok) {
-      alert('✅ Notificación enviada correctamente')
-    } else {
+    console.log('📦 Enviando payload:', payload)
+
+    try {
+      const res = await fetch('https://tfnbyjiuoklehdaorlsi.supabase.co/functions/v1/notificar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify(payload),
+      })
+
       const msg = await res.text()
-      alert('❌ Error: ' + msg)
+
+      if (res.ok) {
+        alert('✅ Notificación enviada correctamente')
+      } else {
+        alert('❌ Error: ' + msg)
+      }
+    } catch (error) {
+      alert('❌ Error al enviar la notificación: ' + (error instanceof Error ? error.message : String(error)))
     }
 
     setEnviando(false)
