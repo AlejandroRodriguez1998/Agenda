@@ -59,7 +59,7 @@ html, body {
 }
 
 .fc-daygrid-day.selected-day {
-  background-color: rgba(68, 66, 66, 0.705); /* azul Bootstrap con opacidad */
+  background-color: rgba(151, 138, 138, 0.521); /* azul Bootstrap con opacidad */
 }
 
 /* Día seleccionado más destacado */
