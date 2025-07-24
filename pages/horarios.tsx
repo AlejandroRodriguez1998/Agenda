@@ -1,83 +1,166 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/router'
+import TopNav from '@/components/TopNav'
+import ModalHorario from '@/components/ModalHorario'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
+import Swal from 'sweetalert2'
+import Head from 'next/head'
 
-export default function CrearHorario() {
-  const [titulo, setTitulo] = useState('')
-  const [fechaLocal, setFechaLocal] = useState('')
-  const [userId, setUserId] = useState<string | null>(null)
-  const [mensaje, setMensaje] = useState('')
+type Horario = {
+  id: string
+  asignatura_id: string
+  tipo: 'teórica' | 'laboratorio'
+  hora: string
+  dias: string[]
+  asignatura?: {
+    id: string
+    nombre: string
+    color?: string
+  }
+}
+
+const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes']
+
+export default function HorariosPage() {
   const router = useRouter()
+  const [usuarioVerificado, setUsuarioVerificado] = useState(false)
+  const [horarios, setHorarios] = useState<Horario[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [modalVisible, setModalVisible] = useState(false)
+  const [horarioEditando, setHorarioEditando] = useState<Horario | null>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    const verificarSesion = async () => {
+      const { data } = await supabase.auth.getSession()
       const user = data.session?.user
-      if (user) {
-        setUserId(user.id)
-      } else {
+      if (!user) {
         router.push('/login')
+      } else {
+        setUsuarioVerificado(true)
+        await cargarHorarios()
       }
-    })
-  }, [])
-
-  const crearHorario = async () => {
-    if (!titulo || !fechaLocal || !userId) {
-      setMensaje('Rellena todos los campos')
-      return
     }
 
-    // Convertir la fecha local del input a UTC ISO string
-    const localDate = new Date(fechaLocal)
-    const fechaUTC = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000).toISOString()
+    verificarSesion()
+  }, [router])
 
-    const { error } = await supabase.from('horario').insert([
-      {
-        user_id: userId,
-        titulo,
-        descripcion: '',
-        fecha: fechaUTC,
-      },
-    ])
+  const cargarHorarios = async () => {
+    setCargando(true)
 
-    if (error) {
-      console.error('Error al crear horario:', error)
-      setMensaje('❌ Error al crear horario')
-    } else {
-      setMensaje('✅ Horario creado correctamente')
-      setTitulo('')
-      setFechaLocal('')
+    const { data: horariosData } = await supabase
+      .from('horario')
+      .select('id, asignatura_id, tipo, hora, dias, asignatura:asignaturas(id, nombre, color)')
+      .order('hora', { ascending: true })
+
+    if (horariosData) {
+      setHorarios(
+        horariosData.map((h: any) => ({
+          ...h,
+          asignatura: Array.isArray(h.asignatura) ? h.asignatura[0] : h.asignatura,
+        }))
+      )
+    }
+
+    setCargando(false)
+  }
+
+  const eliminarHorario = async (id: string) => {
+    const confirmar = await Swal.fire({
+      title: '¿Eliminar horario?',
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, borrar',
+      cancelButtonText: 'Cancelar',
+    })
+
+    if (confirmar.isConfirmed) {
+      await supabase.from('horario').delete().eq('id', id)
+      await cargarHorarios()
     }
   }
 
+  const horariosPorDia = diasSemana.reduce((acc, dia) => {
+    acc[dia] = horarios.filter((h) => h.dias?.includes(dia))
+    return acc
+  }, {} as Record<string, Horario[]>)
+
+  if (!usuarioVerificado) {
+    return <p className="p-4 text-white">Verificando sesión...</p>
+  }
+
   return (
-    <div style={{ maxWidth: 500, margin: '2rem auto', padding: 20 }}>
-      <h2>Crear nuevo horario</h2>
+    <>
+      <Head>
+        <title>Horarios</title>
+      </Head>
 
-      <div className="mb-3">
-        <label className="form-label">Título</label>
-        <input
-          type="text"
-          className="form-control"
-          value={titulo}
-          onChange={(e) => setTitulo(e.target.value)}
-        />
+      <TopNav
+        title="📅 Horarios"
+        onAddClick={() => {
+          setHorarioEditando(null)
+          setModalVisible(true)
+        }}
+      />
+
+      <div className="container mt-3 mb-5 pb-5">
+        {cargando ? (
+          <div className="text-center mt-4">
+            <div className="spinner-border text-primary" role="status" />
+          </div>
+        ) : (
+          diasSemana.map((dia) => (
+            <div key={dia} className="mb-4">
+              <h5 className="text-white fw-bold mb-3 text-capitalize">{dia}</h5>
+              {horariosPorDia[dia].length > 0 ? (
+                horariosPorDia[dia].map((h) => (
+                  <div
+                    key={h.id}
+                    className="d-flex justify-content-between align-items-center p-3 rounded text-white mb-2"
+                    style={{
+                      backgroundColor: h.asignatura?.color || '#343a40',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    <div>
+                      <strong>{h.asignatura?.nombre || 'Asignatura'}</strong>
+                      <div className="small">{h.tipo} · {h.hora}</div>
+                    </div>
+                    <div>
+                      <button
+                        className="btn btn-sm btn-outline-light me-2"
+                        onClick={() => {
+                          setHorarioEditando(h)
+                          setModalVisible(true)
+                        }}
+                      >
+                        <FontAwesomeIcon icon={faPen} />
+                      </button>
+                      <button
+                        className="btn btn-sm btn-outline-light"
+                        onClick={() => eliminarHorario(h.id)}
+                      >
+                        <FontAwesomeIcon icon={faTrash} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-white-50">No hay clases.</p>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
-      <div className="mb-3">
-        <label className="form-label">Fecha y hora</label>
-        <input
-          type="datetime-local"
-          className="form-control"
-          value={fechaLocal}
-          onChange={(e) => setFechaLocal(e.target.value)}
-        />
-      </div>
-
-      <button className="btn btn-primary" onClick={crearHorario}>
-        Guardar horario
-      </button>
-
-      {mensaje && <div className="mt-3 alert alert-info">{mensaje}</div>}
-    </div>
+      <ModalHorario
+        visible={modalVisible}
+        horario={horarioEditando}
+        onClose={() => setModalVisible(false)}
+        onSuccess={cargarHorarios}
+      />
+    </>
   )
 }

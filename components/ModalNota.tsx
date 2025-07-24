@@ -87,7 +87,7 @@ export default function ModalNota({ visible, asignaturaId, onClose, onSuccess }:
             </div>
             <div className="mb-3">
               <label className="form-label">Peso (%)</label>
-              <input type="number" className="form-control" value={peso} onChange={(e) => setPeso(e.target.value)} min={1} max={100} />
+              <input type="number" className="form-control" value={peso} onChange={(e) => setPeso(e.target.value)} min={0} max={100} />
             </div>
             <div className="d-flex justify-content-center gap-2 mt-4">
                 <button className="btn btn-primary w-100" onClick={handleGuardar}>Añadir</button>

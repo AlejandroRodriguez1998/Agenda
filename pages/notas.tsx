@@ -1,3 +1,5 @@
+// pages/notas.tsx
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
@@ -170,11 +172,95 @@ export default function NotasPage() {
           <div className="text-center mt-5">
             <div className="spinner-border text-primary" role="status"></div>
           </div>
-        ) : !seleccionada ? (
+        ) : seleccionada ? (
+          <>
+            {notas.length === 0 ? (
+              <p className="text-white text-center">No hay notas aún.</p>
+            ) : (
+              <div
+                className="p-3 rounded shadow-sm d-flex flex-column gap-3"
+                style={{
+                  backgroundColor: '#1e1e1e',
+                  border: '1px solid #333',
+                }}
+              >
+                <div className="d-flex align-items-center gap-3 mb-2">
+                  <div
+                    style={{
+                      width: '60px',
+                      height: '60px',
+                      borderRadius: '50%',
+                      backgroundColor:
+                        asignaturas.find((a) => a.id === seleccionada)?.color || '#0d6efd',
+                      color: 'white',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      fontWeight: 'bold',
+                      fontSize: '1.2rem',
+                    }}
+                  >
+                    {calcularNotaFinal(notas).toFixed(2)}
+                  </div>
+                  <div className="text-white">
+                    <div className="fw-bold">
+                      {asignaturas.find((a) => a.id === seleccionada)?.nombre}
+                    </div>
+                    <div className="text-white-50">
+                      Total: {notas.reduce((acc, n) => acc + n.peso, 0)}%
+                    </div>
+                  </div>
+                </div>
+
+                <div className="d-flex flex-column gap-2">
+                  {notas.map((n) => (
+                    <div
+                      key={n.id}
+                      className="d-flex justify-content-between align-items-center px-2 py-2 rounded"
+                      style={{ backgroundColor: '#2a2a2a' }}
+                    >
+                      <div>
+                        <div className="fw-bold text-white">{n.tipo}</div>
+                        <div className="text-white-50 small">Peso: {n.peso}%</div>
+                      </div>
+                      <div className="d-flex align-items-center gap-3">
+                        <div className="fs-6 fw-bold text-white">{n.nota}</div>
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={() => eliminarNota(n.id)}
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <ModalNota
+              visible={modalVisible}
+              asignaturaId={seleccionada}
+              onClose={() => setModalVisible(false)}
+              onSuccess={cargarAsignaturasYNotas}
+            />
+          </>
+        ) : (
           <>
             {mediaGlobal ? (
               <div className="text-center mb-4">
-                <div style={{ width: 120, height: 120, borderRadius: '50%', backgroundColor: '#0d6efd', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 28, fontWeight: 'bold', margin: '0 auto 1rem' }}>
+                <div style={{
+                  width: 120,
+                  height: 120,
+                  borderRadius: '50%',
+                  backgroundColor: '#0d6efd',
+                  color: 'white',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  fontSize: 28,
+                  fontWeight: 'bold',
+                  margin: '0 auto 1rem',
+                }}>
                   {mediaGlobal}
                 </div>
                 <p className="text-white">Media global de todas las asignaturas</p>
@@ -184,7 +270,7 @@ export default function NotasPage() {
             )}
 
             {Object.entries(notasPorCurso)
-              .sort((a, b) => Number(a[0]) - Number(b[0])) // Ordenar cursos numéricamente
+              .sort((a, b) => Number(a[0]) - Number(b[0]))
               .map(([curso, lista]) => (
                 <div key={curso} className="mb-3">
                   <h5 className="text-white fw-bold mb-2">{curso}ª curso</h5>
@@ -200,52 +286,6 @@ export default function NotasPage() {
                   ))}
                 </div>
               ))}
-          </>
-        ) : (
-          <>
-            {notas.length === 0 ? (
-              <p className="text-white text-center">No hay notas aún.</p>
-            ) : (
-              <table className="table table-bordered">
-                <thead className="table-light">
-                  <tr>
-                    <th>Tipo</th>
-                    <th>Nota</th>
-                    <th>Peso</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {notas.map((n) => (
-                    <tr key={n.id}>
-                      <td>{n.tipo}</td>
-                      <td>{n.nota}</td>
-                      <td>{n.peso}%</td>
-                      <td>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => eliminarNota(n.id)}>
-                          <FontAwesomeIcon icon={faTrash} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="table-light">
-                  <tr>
-                    <td className="fw-bold">Final</td>
-                    <td className="fw-bold">{calcularNotaFinal(notas).toFixed(2)}</td>
-                    <td className="fw-bold">{notas.reduce((acc, n) => acc + n.peso, 0)}%</td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
-            )}
-
-            <ModalNota
-              visible={modalVisible}
-              asignaturaId={seleccionada}
-              onClose={() => setModalVisible(false)}
-              onSuccess={cargarAsignaturasYNotas}
-            />
           </>
         )}
       </div>
