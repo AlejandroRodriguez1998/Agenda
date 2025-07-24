@@ -54,9 +54,10 @@ export default function HorariosPage() {
       .select('id, asignatura_id, tipo, hora, dias, asignatura:asignaturas(id, nombre, color)')
       .order('hora', { ascending: true })
 
+    // Justo en esta parte...
     if (horariosData) {
       setHorarios(
-        horariosData.map((h: any) => ({
+        (horariosData as unknown as Horario[]).map((h) => ({
           ...h,
           asignatura: Array.isArray(h.asignatura) ? h.asignatura[0] : h.asignatura,
         }))
