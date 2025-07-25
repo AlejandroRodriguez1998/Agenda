@@ -21,7 +21,15 @@ type Horario = {
   }
 }
 
-const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes']
+const diasSemana = [
+  'lunes',
+  'martes',
+  'miércoles',
+  'jueves',
+  'viernes',
+  'sábado',
+  'domingo',
+]
 
 export default function HorariosPage() {
   const router = useRouter()
@@ -30,6 +38,10 @@ export default function HorariosPage() {
   const [cargando, setCargando] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
   const [horarioEditando, setHorarioEditando] = useState<Horario | null>(null)
+  const [diaSeleccionado, setDiaSeleccionado] = useState<string>(() => {
+    const hoy = new Date().toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase()
+    return diasSemana.includes(hoy) ? hoy : 'todos'
+  })
 
   useEffect(() => {
     const verificarSesion = async () => {
@@ -54,7 +66,6 @@ export default function HorariosPage() {
       .select('id, asignatura_id, tipo, hora, dias, asignatura:asignaturas(id, nombre, color)')
       .order('hora', { ascending: true })
 
-    // Justo en esta parte...
     if (horariosData) {
       setHorarios(
         (horariosData as unknown as Horario[]).map((h) => ({
@@ -88,6 +99,39 @@ export default function HorariosPage() {
     return acc
   }, {} as Record<string, Horario[]>)
 
+  const renderHorario = (h: Horario) => (
+    <div
+      key={h.id}
+      className="d-flex justify-content-between align-items-center p-3 rounded text-white mb-2"
+      style={{
+        backgroundColor: h.asignatura?.color || '#343a40',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+      }}
+    >
+      <div>
+        <strong>{h.asignatura?.nombre || 'Asignatura'}</strong>
+        <div className="small">{h.tipo.charAt(0).toUpperCase() + h.tipo.slice(1)} · {h.hora}</div>
+      </div>
+      <div>
+        <button
+          className="btn btn-sm btn-outline-light me-2"
+          onClick={() => {
+            setHorarioEditando(h)
+            setModalVisible(true)
+          }}
+        >
+          <FontAwesomeIcon icon={faPen} />
+        </button>
+        <button
+          className="btn btn-sm btn-outline-light"
+          onClick={() => eliminarHorario(h.id)}
+        >
+          <FontAwesomeIcon icon={faTrash} />
+        </button>
+      </div>
+    </div>
+  )
+
   if (!usuarioVerificado) {
     return <p className="p-4 text-white">Verificando sesión...</p>
   }
@@ -99,60 +143,61 @@ export default function HorariosPage() {
       </Head>
 
       <TopNav
-        title="📅 Horarios"
+        title="🕰️ Horarios"
         onAddClick={() => {
           setHorarioEditando(null)
           setModalVisible(true)
         }}
       />
 
-      <div className="container mt-3 mb-5 pb-5">
+      <ul className="nav nav-tabs justify-content-center mb-3 small border border-0">
+        {['todos', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'].map((dia, idx) => {
+          const abreviado = idx === 0 ? 'Todos' : ['L', 'M', 'X', 'J', 'V', 'S', 'D'][idx - 1]
+          return (
+            <li key={dia} className="nav-item border-bottom px-1">
+              <a
+                href="#"
+                className={`nav-link ${diaSeleccionado === dia ? 'active text-black' : 'text-white'}`}
+                onClick={(e) => {
+                  e.preventDefault()
+                  setDiaSeleccionado(dia)
+                }}>
+                <>
+                  <span className="d-inline d-sm-none">{abreviado}</span>
+                  <span className="d-none d-sm-inline">
+                    {idx === 0 ? 'Todos' : ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][idx - 1]}
+                  </span>
+                </>
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+
+      <div className="container mb-5 pb-5">
         {cargando ? (
           <div className="text-center mt-4">
             <div className="spinner-border text-primary" role="status" />
           </div>
-        ) : (
+        ) : diaSeleccionado === 'todos' ? (
           diasSemana.map((dia) => (
             <div key={dia} className="mb-4">
               <h5 className="text-white fw-bold mb-3 text-capitalize">{dia}</h5>
-              {horariosPorDia[dia].length > 0 ? (
-                horariosPorDia[dia].map((h) => (
-                  <div
-                    key={h.id}
-                    className="d-flex justify-content-between align-items-center p-3 rounded text-white mb-2"
-                    style={{
-                      backgroundColor: h.asignatura?.color || '#343a40',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                    }}
-                  >
-                    <div>
-                      <strong>{h.asignatura?.nombre || 'Asignatura'}</strong>
-                      <div className="small">{h.tipo} · {h.hora}</div>
-                    </div>
-                    <div>
-                      <button
-                        className="btn btn-sm btn-outline-light me-2"
-                        onClick={() => {
-                          setHorarioEditando(h)
-                          setModalVisible(true)
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faPen} />
-                      </button>
-                      <button
-                        className="btn btn-sm btn-outline-light"
-                        onClick={() => eliminarHorario(h.id)}
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    </div>
-                  </div>
-                ))
+              {horariosPorDia[dia]?.length > 0 ? (
+                horariosPorDia[dia].map(renderHorario)
               ) : (
                 <p className="text-white-50">No hay clases.</p>
               )}
             </div>
           ))
+        ) : (
+          <div className="mb-4">
+            {horariosPorDia[diaSeleccionado]?.length > 0 ? (
+              horariosPorDia[diaSeleccionado].map(renderHorario)
+            ) : (
+              <p className="text-white-50">No hay clases.</p>
+            )}
+          </div>
         )}
       </div>
 
