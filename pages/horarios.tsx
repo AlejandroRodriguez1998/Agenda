@@ -154,7 +154,7 @@ export default function HorariosPage() {
         {['todos', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'].map((dia, idx) => {
           const abreviado = idx === 0 ? 'Todos' : ['L', 'M', 'X', 'J', 'V', 'S', 'D'][idx - 1]
           return (
-            <li key={dia} className="nav-item border-bottom px-1">
+            <li key={dia} className="nav-item border-bottom">
               <a
                 href="#"
                 className={`nav-link ${diaSeleccionado === dia ? 'active text-black' : 'text-white'}`}
