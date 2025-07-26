@@ -23,7 +23,7 @@ type Asignatura = {
   curso: string
 }
 
-const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes']
+const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
 
 export default function ModalHorario({ visible, onClose, onSuccess, horario }: Props) {
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
