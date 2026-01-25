@@ -1,38 +1,38 @@
 // components/UserModal.tsx
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { auth } from '@/lib/firebaseClient'
 import Swal from 'sweetalert2'
 import toast from 'react-hot-toast'
 import { faCog } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  deleteUser,
+  onAuthStateChanged,
+  signOut,
+  updatePassword,
+  type User,
+} from 'firebase/auth'
 
 export default function ModalUsuario() {
   const [visible, setVisible] = useState(false)
   const [newPassword, setNewPassword] = useState('')
-  const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null)
+  const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
-    const cargarUsuario = async () => {
-        const { data } = await supabase.auth.getUser()
-        setUser(data.user)
-    }
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser)
+    })
 
-    cargarUsuario()
-  }, [visible]) 
+    return () => unsubscribe()
+  }, [])
 
   const cerrarSesion = async () => {
-    await supabase.auth.signOut()
+    await signOut(auth)
     localStorage.setItem('showLogoutToast', 'true')
     window.location.href = '/'
   }
 
   const borrarCuenta = async () => {
-
-    /*  <div className="d-flex justify-content-start mt-5 mb-3">
-                            <button className="btn btn-danger" onClick={borrarCuenta}>Borrar cuenta</button>
-                        </div>
-    */
-
     const confirmar = await Swal.fire({
       title: '¿Estás seguro?',
       text: 'Esta acción eliminará tu cuenta permanentemente',
@@ -43,37 +43,43 @@ export default function ModalUsuario() {
     })
 
     if (confirmar.isConfirmed) {
-      const { data } = await supabase.auth.getSession()
-      const user = data.session?.user
-      if (!user) return toast.error('No hay sesión activa', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
+      if (!user) {
+        return toast.error('No hay sesión activa', {
+          style: {
+            background: '#1a1a1a',
+            color: '#fff',
+          },
+        })
+      }
 
-      const { error } = await supabase.rpc('delete_user_by_id', { user_id: user.id })
-      if (error) toast.error(error.message, {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-      else {
+      try {
+        await deleteUser(user)
         toast.success('Cuenta eliminada', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-        await cerrarSesion()
+          style: {
+            background: '#1a1a1a',
+            color: '#fff',
+          },
+        })
+        window.location.href = '/'
+      } catch (err) {
+        const firebaseError = err as { code?: string; message?: string }
+        const mensaje =
+          firebaseError.code === 'auth/requires-recent-login'
+            ? 'Vuelve a iniciar sesión para eliminar tu cuenta'
+            : firebaseError.message || 'No se pudo eliminar la cuenta'
+        toast.error(mensaje, {
+          style: {
+            background: '#1a1a1a',
+            color: '#fff',
+          },
+        })
       }
     }
   }
 
-  const cambiarContraseña = async () => {
+  const cambiarContrasena = async () => {
     if (!newPassword || newPassword.length < 6) {
-      return toast.error('La contraseña debe tener al menos 6 caracteres', {
+      return toast.error('La contrasena debe tener al menos 6 caracteres', {
         style: {
           background: '#1a1a1a',
           color: '#fff',
@@ -81,22 +87,35 @@ export default function ModalUsuario() {
       })
     }
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) toast.error(error.message, {
+    if (!user) {
+      return toast.error('No hay sesión activa', {
         style: {
           background: '#1a1a1a',
           color: '#fff',
         },
       })
-    else toast.success('Contraseña actualizada', {
+    }
+
+    try {
+      await updatePassword(user, newPassword)
+      toast.success('Contrasena actualizada', {
         style: {
           background: '#1a1a1a',
           color: '#fff',
         },
       })
+    } catch (err) {
+      const firebaseError = err as { message?: string }
+      toast.error(firebaseError.message || 'No se pudo actualizar la contrasena', {
+        style: {
+          background: '#1a1a1a',
+          color: '#fff',
+        },
+      })
+    }
   }
 
-  const handleClose = () => setVisible(false);
+  const handleClose = () => setVisible(false)
 
   return (
     <>
@@ -105,29 +124,41 @@ export default function ModalUsuario() {
       </button>
 
       {visible && (
-        <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={handleClose}>
-            <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-content bg-dark text-white">
-                    <div className="modal-body">
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                            <h5 className="modal-title mb-0">👤 Usuario</h5>
-                            <button className="btn btn-outline-light" onClick={cerrarSesion}>
-                                Cerrar sesión
-                            </button>
-                        </div>
-
-                        <h4 className="text-white text-center my-4">
-                            <strong> {user?.email ?? ''}</strong>
-                        </h4>
-
-                        <label className="form-label">Nueva contraseña</label>
-                        <input type="password" className="form-control mb-3" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="********"/>
-
-                        <button className="btn btn-primary w-100 mb-2" onClick={cambiarContraseña}>Cambiar contraseña</button>
-
-                    </div>
+        <div
+          className="modal fade show d-block"
+          tabIndex={-1}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={handleClose}
+        >
+          <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content bg-dark text-white">
+              <div className="modal-body">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h5 className="modal-title mb-0">👤 Usuario</h5>
+                  <button className="btn btn-outline-light" onClick={cerrarSesion}>
+                    Cerrar sesión
+                  </button>
                 </div>
+
+                <h4 className="text-white text-center my-4">
+                  <strong> {user?.email ?? ''}</strong>
+                </h4>
+
+                <label className="form-label">Nueva contrasena</label>
+                <input
+                  type="password"
+                  className="form-control mb-3"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="********"
+                />
+
+                <button className="btn btn-primary w-100 mb-2" onClick={cambiarContrasena}>
+                  Cambiar contrasena
+                </button>
+              </div>
             </div>
+          </div>
         </div>
       )}
     </>

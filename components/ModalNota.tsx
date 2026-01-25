@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { db } from '@/lib/firebaseClient'
 import toast from 'react-hot-toast'
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 
 type ModalNotaProps = {
   visible: boolean
   asignaturaId: string
+  userId: string
   onClose: () => void
   onSuccess: () => void
 }
 
-export default function ModalNota({ visible, asignaturaId, onClose, onSuccess }: ModalNotaProps) {
+export default function ModalNota({ visible, asignaturaId, userId, onClose, onSuccess }: ModalNotaProps) {
   const [tipo, setTipo] = useState('')
   const [nota, setNota] = useState('')
   const [peso, setPeso] = useState('')
@@ -25,8 +27,6 @@ export default function ModalNota({ visible, asignaturaId, onClose, onSuccess }:
       return
     }
 
-    const { data: sessionData } = await supabase.auth.getSession()
-    const userId = sessionData.session?.user?.id
     if (!userId) {
       toast.error('No hay sesión activa', {
         style: {
@@ -37,15 +37,16 @@ export default function ModalNota({ visible, asignaturaId, onClose, onSuccess }:
       return
     }
 
-    const { error } = await supabase.from('notas_academicas').insert({
-      user_id: userId,
-      asignatura_id: asignaturaId,
-      tipo,
-      nota: parseFloat(nota),
-      peso: parseFloat(peso),
-    })
+    try {
+      await addDoc(collection(db, 'notas_academicas'), {
+        user_id: userId,
+        asignatura_id: asignaturaId,
+        tipo,
+        nota: parseFloat(nota),
+        peso: parseFloat(peso),
+        created_at: serverTimestamp(),
+      })
 
-    if (!error) {
       toast.success('Nota añadida', {
         style: {
           background: '#1a1a1a',
@@ -57,7 +58,7 @@ export default function ModalNota({ visible, asignaturaId, onClose, onSuccess }:
       setPeso('')
       onSuccess()
       onClose()
-    } else {
+    } catch (err) {
       toast.error('Error al guardar nota', {
         style: {
           background: '#1a1a1a',
@@ -90,11 +91,10 @@ export default function ModalNota({ visible, asignaturaId, onClose, onSuccess }:
               <input type="number" className="form-control" value={peso} onChange={(e) => setPeso(e.target.value)} min={0} max={100} />
             </div>
             <div className="d-flex justify-content-center gap-2 mt-4">
-                <button className="btn btn-primary w-100" onClick={handleGuardar}>Añadir</button>
-                <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+              <button className="btn btn-primary w-100" onClick={handleGuardar}>Añadir</button>
+              <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
             </div>
           </div>
-          
         </div>
       </div>
     </div>

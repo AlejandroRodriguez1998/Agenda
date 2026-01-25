@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
+import { auth } from '@/lib/firebaseClient'
 import TopNav from '@/components/TopNav'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import Head from 'next/head'
 import CalendarioUsuario from '@/components/CalendarioUsuario'
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth'
 
 export default function InicioPage() {
   const router = useRouter()
-  const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
@@ -20,14 +21,12 @@ export default function InicioPage() {
       })
     }
 
-    const obtenerUsuario = async () => {
-      const { data } = await supabase.auth.getSession()
-      const usuario = data.session?.user
-      setUser(usuario ?? null)
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser ?? null)
       setCargando(false)
-    }
+    })
 
-    obtenerUsuario()
+    return () => unsubscribe()
   }, [])
 
   return (
@@ -46,12 +45,12 @@ export default function InicioPage() {
             title="🏠 Inicio"
             customRightIcon="logout"
             onRightClick={async () => {
-              await supabase.auth.signOut()
+              await signOut(auth)
               localStorage.setItem('showLogoutToast', 'true')
               router.push('/').then(() => router.reload())
             }}
           />
-          <CalendarioUsuario userId={user.id} />
+          <CalendarioUsuario userId={user.uid} />
         </>
       ) : (
         <div style={{ minHeight: '100vh', color: 'white' }}>

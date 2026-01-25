@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { db } from '@/lib/firebaseClient'
 import toast from 'react-hot-toast'
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
 
 type TareaModalProps = {
   visible: boolean
   onClose: () => void
   onSuccess: () => void
+  userId: string
   tarea?: {
     id: string
     titulo: string
@@ -17,25 +29,34 @@ type TareaModalProps = {
 type Asignatura = {
   id: string
   nombre: string
-  curso: string
+  curso: number
 }
 
-export default function ModalTarea({ visible, onClose, onSuccess, tarea }: TareaModalProps) {
+export default function ModalTarea({ visible, onClose, onSuccess, tarea, userId }: TareaModalProps) {
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
   const [asignaturaId, setAsignaturaId] = useState(tarea?.asignatura_id || '')
   const [titulo, setTitulo] = useState(tarea?.titulo || '')
   const [fecha, setFecha] = useState(tarea?.fecha_entrega || '')
 
   useEffect(() => {
-    supabase
-      .from('asignaturas')
-      .select('id, nombre, curso')
-      .order('curso')
-      .order('nombre')
-      .then(({ data }) => {
-        if (data) setAsignaturas(data)
-      })
-  }, [])
+    const cargarAsignaturas = async () => {
+      if (!userId) return
+      const q = query(
+        collection(db, 'asignaturas'),
+        where('user_id', '==', userId),
+        orderBy('curso'),
+        orderBy('nombre')
+      )
+      const snapshot = await getDocs(q)
+      const data = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<Asignatura, 'id'>),
+      }))
+      setAsignaturas(data)
+    }
+
+    cargarAsignaturas()
+  }, [userId])
 
   useEffect(() => {
     if (tarea) {
@@ -60,8 +81,6 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea }: Tarea
       return
     }
 
-    const { data: session } = await supabase.auth.getSession()
-    const userId = session.session?.user?.id
     if (!userId) {
       return toast.error('No hay sesión activa', {
         style: {
@@ -73,23 +92,22 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea }: Tarea
 
     const payload = {
       titulo: titulo.trim(),
-      fecha_entrega: fecha,
+      fecha_entrega: fecha || null,
       asignatura_id: asignaturaId,
       user_id: userId,
     }
 
-    const { error } = tarea
-      ? await supabase.from('tareas').update(payload).eq('id', tarea.id)
-      : await supabase.from('tareas').insert(payload)
+    try {
+      if (tarea) {
+        await updateDoc(doc(db, 'tareas', tarea.id), payload)
+      } else {
+        await addDoc(collection(db, 'tareas'), {
+          ...payload,
+          completada: false,
+          created_at: serverTimestamp(),
+        })
+      }
 
-    if (error) {
-      toast.error(error.message, {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-    } else {
       toast.success(tarea ? 'Tarea actualizada' : 'Tarea añadida', {
         style: {
           background: '#1a1a1a',
@@ -101,12 +119,18 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea }: Tarea
       setFecha('')
       onSuccess()
       onClose()
+    } catch (err) {
+      const firebaseError = err as { message?: string }
+      toast.error(firebaseError.message || 'Error al guardar tarea', {
+        style: {
+          background: '#1a1a1a',
+          color: '#fff',
+        },
+      })
     }
   }
 
   if (!visible) return null
-
-  console.log('ModalTarea renderizado', { asignaturas })
 
   // Agrupamos por curso
   const asignaturasPorCurso = asignaturas.reduce((acc, a) => {

@@ -1,13 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
+import { auth, db } from '@/lib/firebaseClient'
 import ModalTarea from '@/components/ModalTarea'
 import TopNav from '@/components/TopNav'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import  Head  from 'next/head'
+import Head from 'next/head'
 import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 
 type Tarea = {
   id: string
@@ -22,7 +33,7 @@ type Asignatura = {
   id: string
   nombre: string
   color?: string
-  tareas: Tarea[] // 👈 obligatorio, no opcional
+  tareas: Tarea[]
 }
 
 export default function TareasPage() {
@@ -32,51 +43,61 @@ export default function TareasPage() {
   const [usuarioVerificado, setUsuarioVerificado] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [tareaEditando, setTareaEditando] = useState<Tarea | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    const verificarSesion = async () => {
-      const { data } = await supabase.auth.getSession()
-      const user = data.session?.user
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.replace('/login')
       } else {
+        setUserId(user.uid)
         setUsuarioVerificado(true)
-        await cargarAsignaturasYtareas()
+        await cargarAsignaturasYtareas(user.uid)
       }
-    }
+    })
 
-    verificarSesion()
+    return () => unsubscribe()
   }, [router])
 
-  const cargarAsignaturasYtareas = async () => {
+  const cargarAsignaturasYtareas = async (uid: string) => {
     setCargando(true)
 
-    const { data: asignaturasData } = await supabase
-      .from('asignaturas')
-      .select('*')
-      .order('nombre')
+    const asignaturasQuery = query(
+      collection(db, 'asignaturas'),
+      where('user_id', '==', uid),
+      orderBy('nombre')
+    )
+    const asignaturasSnapshot = await getDocs(asignaturasQuery)
+    const asignaturasData = asignaturasSnapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Asignatura, 'id' | 'tareas'>),
+    }))
 
-    if (!asignaturasData) return
-
-    const { data: tareasData } = await supabase
-      .from('tareas')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const tareasQuery = query(
+      collection(db, 'tareas'),
+      where('user_id', '==', uid),
+      orderBy('created_at', 'desc')
+    )
+    const tareasSnapshot = await getDocs(tareasQuery)
+    const tareasData = tareasSnapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Tarea, 'id'>),
+    }))
 
     const asignaturasConTareas: Asignatura[] = asignaturasData
       .map((a) => ({
         ...a,
         tareas: tareasData?.filter((t) => t.asignatura_id === a.id) || [],
       }))
-      .filter((a) => a.tareas.length > 0) // ✅ solo asignaturas con tareas
+      .filter((a) => a.tareas.length > 0)
 
     setAsignaturas(asignaturasConTareas)
     setCargando(false)
   }
 
   const cambiarEstado = async (id: string, completada: boolean) => {
-    const { error } = await supabase.from('tareas').update({ completada }).eq('id', id)
-    if (!error) await cargarAsignaturasYtareas()
+    await updateDoc(doc(db, 'tareas', id), { completada })
+    if (userId) await cargarAsignaturasYtareas(userId)
   }
 
   const eliminarTarea = async (id: string) => {
@@ -92,16 +113,14 @@ export default function TareasPage() {
     })
 
     if (result.isConfirmed) {
-      const { error } = await supabase.from('tareas').delete().eq('id', id)
-      if (!error) {
-        toast.success('Tarea eliminada', {
+      await deleteDoc(doc(db, 'tareas', id))
+      toast.success('Tarea eliminada', {
         style: {
           background: '#1a1a1a',
           color: '#fff',
         },
       })
-        await cargarAsignaturasYtareas()
-      }
+      if (userId) await cargarAsignaturasYtareas(userId)
     }
   }
 
@@ -109,25 +128,20 @@ export default function TareasPage() {
     return <p className="p-4">Verificando sesión...</p>
   }
 
-  
-
   return (
     <>
       <Head>
         <title>Tareas</title>
       </Head>
-      <TopNav title="📝 Tareas" onAddClick={() => {
+      <TopNav title="👋 Tareas" onAddClick={() => {
         setTareaEditando(null)
         setModalVisible(true)
-      }} /> 
+      }} />
       <div className="container mt-3 mb-5 pb-5">
-
         {cargando ? (
-
           <div className="text-center">
             <div className="spinner-border text-primary" role="status" />
           </div>
-
         ) : asignaturas.length === 0 ? (
           <p className="text-white text-center">No tienes tareas aún.</p>
         ) : (
@@ -165,18 +179,22 @@ export default function TareasPage() {
           ))
         )}
 
-        <ModalTarea
-          visible={modalVisible}
-          tarea={tareaEditando
-            ? {
-              id: tareaEditando.id,
-              titulo: tareaEditando.titulo,
-              fecha_entrega: tareaEditando.fecha_entrega ?? '',
-              asignatura_id: tareaEditando.asignatura_id,
-            }
-            : undefined}
-          onClose={() => setModalVisible(false)}
-          onSuccess={cargarAsignaturasYtareas} />
+        {userId && (
+          <ModalTarea
+            visible={modalVisible}
+            tarea={tareaEditando
+              ? {
+                id: tareaEditando.id,
+                titulo: tareaEditando.titulo,
+                fecha_entrega: tareaEditando.fecha_entrega ?? '',
+                asignatura_id: tareaEditando.asignatura_id,
+              }
+              : undefined}
+            onClose={() => setModalVisible(false)}
+            onSuccess={() => userId && cargarAsignaturasYtareas(userId)}
+            userId={userId}
+          />
+        )}
       </div>
     </>
   )

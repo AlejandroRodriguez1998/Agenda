@@ -1,24 +1,26 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { auth } from '@/lib/firebaseClient'
 import { useRouter } from 'next/router'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 
 export default function LogoutPage() {
   const router = useRouter()
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
-    const logout = async () => {
-      const { data } = await supabase.auth.getSession()
-      if (!data.session?.user) {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
         router.replace('/')
+        setCargando(false)
         return
       }
 
-      await supabase.auth.signOut()
+      await signOut(auth)
       router.replace('/login')
-    }
+      setCargando(false)
+    })
 
-    logout().finally(() => setCargando(false))
+    return () => unsubscribe()
   }, [router])
 
   return (

@@ -1,25 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
+import { auth } from '@/lib/firebaseClient'
 import AuthForm from '@/components/auth/AuthForm'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
+import { onAuthStateChanged } from 'firebase/auth'
 
 export default function LoginPage() {
   const router = useRouter()
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
-    const comprobarSesion = async () => {
-      const { data } = await supabase.auth.getSession()
-      if (data.session?.user) {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
         router.replace('/')
       } else {
         setCargando(false)
       }
-    }
+    })
 
-    comprobarSesion()
+    return () => unsubscribe()
   }, [router])
 
   if (cargando) {

@@ -4,12 +4,13 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import esLocale from '@fullcalendar/core/locales/es'
-import { supabase } from '@/lib/supabaseClient'
+import { db } from '@/lib/firebaseClient'
 import toast from 'react-hot-toast'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus, faTrash, faPen } from '@fortawesome/free-solid-svg-icons'
 import ModalEvento from './ModalEvento'
 import Swal from 'sweetalert2'
+import { collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore'
 
 type Evento = {
   id: string
@@ -32,6 +33,18 @@ type Tarea = {
   asignaturas: { nombre: string }
 }
 
+type Asignatura = {
+  id: string
+  nombre: string
+}
+
+type HorarioDoc = {
+  asignatura_id: string
+  tipo: string
+  hora: string
+  dias: string[]
+}
+
 export default function CalendarioUsuario({ userId }: { userId: string }) {
   const [eventos, setEventos] = useState<Evento[]>([])
   const [clases, setClases] = useState<Horario[]>([])
@@ -45,16 +58,21 @@ export default function CalendarioUsuario({ userId }: { userId: string }) {
 
   useEffect(() => {
     cargarEventos()
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     cargarClasesYTareas()
-  }, [diaSeleccionado])
+  }, [diaSeleccionado, userId])
 
   const cargarEventos = async () => {
     setCargando(true)
-    const { data } = await supabase.from('eventos').select('*').eq('user_id', userId)
-    if (data) setEventos(data as Evento[])
+    const q = query(collection(db, 'eventos'), where('user_id', '==', userId))
+    const snapshot = await getDocs(q)
+    const data = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Evento, 'id'>),
+    }))
+    setEventos(data)
     setCargando(false)
   }
 
@@ -62,28 +80,57 @@ export default function CalendarioUsuario({ userId }: { userId: string }) {
     const diasSemana = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
     const diaNombre = diasSemana[new Date(diaSeleccionado).getDay()]
 
-    const { data: horariosData } = await supabase
-      .from('horario')
-      .select('id, tipo, hora, dias, asignaturas(nombre)')
-      .contains('dias', [diaNombre])
+    const asignaturasSnapshot = await getDocs(
+      query(collection(db, 'asignaturas'), where('user_id', '==', userId))
+    )
+    const asignaturasMap = new Map(
+      asignaturasSnapshot.docs.map((docSnap) => [
+        docSnap.id,
+        { id: docSnap.id, ...(docSnap.data() as Omit<Asignatura, 'id'>) },
+      ])
+    )
 
+    const horariosSnapshot = await getDocs(
+      query(
+        collection(db, 'horario'),
+        where('user_id', '==', userId),
+        where('dias', 'array-contains', diaNombre)
+      )
+    )
 
-    const fecha = new Date(diaSeleccionado)
-    const fechaInicio = new Date(fecha)
-    fechaInicio.setHours(0, 0, 0, 0)
+    const horariosData = horariosSnapshot.docs.map((docSnap) => {
+      const data = docSnap.data() as HorarioDoc
+      const asignatura = asignaturasMap.get(data.asignatura_id)
+      return {
+        id: docSnap.id,
+        tipo: data.tipo,
+        hora: data.hora,
+        dias: data.dias,
+        asignaturas: { nombre: asignatura?.nombre || '' },
+      }
+    })
 
-    const fechaFin = new Date(fecha)
-    fechaFin.setHours(23, 59, 59, 999)
+    const tareasSnapshot = await getDocs(
+      query(
+        collection(db, 'tareas'),
+        where('user_id', '==', userId),
+        where('fecha_entrega', '==', diaSeleccionado),
+        where('completada', '==', false)
+      )
+    )
 
-    const { data: tareasData } = await supabase
-      .from('tareas')
-      .select('id, titulo, asignaturas(nombre)')
-      .gte('fecha_entrega', fechaInicio.toISOString())
-      .lte('fecha_entrega', fechaFin.toISOString())
-      .is('completada', false)
+    const tareasData = tareasSnapshot.docs.map((docSnap) => {
+      const data = docSnap.data() as { titulo: string; asignatura_id: string }
+      const asignatura = asignaturasMap.get(data.asignatura_id)
+      return {
+        id: docSnap.id,
+        titulo: data.titulo,
+        asignaturas: { nombre: asignatura?.nombre || '' },
+      }
+    })
 
-    if (horariosData) setClases(horariosData as unknown as Horario[])
-    if (tareasData) setTareas(tareasData as unknown as Tarea[])
+    setClases(horariosData as Horario[])
+    setTareas(tareasData as Tarea[])
   }
 
   const eventosDelDia = eventos.filter(e => e.start === diaSeleccionado)
@@ -103,7 +150,7 @@ export default function CalendarioUsuario({ userId }: { userId: string }) {
       cancelButtonText: 'Cancelar',
     })
     if (confirmar.isConfirmed) {
-      await supabase.from('eventos').delete().eq('id', id)
+      await deleteDoc(doc(db, 'eventos', id))
       await cargarEventos()
       toast.success('Evento eliminado', {
         style: { background: '#1a1a1a', color: '#fff' }
@@ -170,11 +217,11 @@ export default function CalendarioUsuario({ userId }: { userId: string }) {
                   right: 'next'
                 }}
                 titleFormat={(date) => {
-                  const jsDate = date.date.marker as Date;
-                  const mes = jsDate.toLocaleString('es-ES', { month: 'long' });
-                  const año = jsDate.getFullYear();
-                  const mesCapitalizado = mes.charAt(0).toUpperCase() + mes.slice(1);
-                  return `${mesCapitalizado} ${año}`;
+                  const jsDate = date.date.marker as Date
+                  const mes = jsDate.toLocaleString('es-ES', { month: 'long' })
+                  const ano = jsDate.getFullYear()
+                  const mesCapitalizado = mes.charAt(0).toUpperCase() + mes.slice(1)
+                  return `${mesCapitalizado} ${ano}`
                 }}
               />
             </div>
@@ -237,7 +284,7 @@ export default function CalendarioUsuario({ userId }: { userId: string }) {
             </div>
 
             <div className="bg-dark text-white rounded p-3 shadow">
-              <h5 className="mb-3">📝 Tareas</h5>
+              <h5 className="mb-3">👋 Tareas</h5>
               {tareas.length > 0 ? (
                 <div className="d-flex flex-column gap-2">
                   {tareas.map(t => (

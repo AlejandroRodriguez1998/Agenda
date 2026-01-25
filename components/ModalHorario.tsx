@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { db } from '@/lib/firebaseClient'
 import toast from 'react-hot-toast'
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
 
 type Horario = {
   id: string
@@ -14,18 +24,19 @@ type Props = {
   visible: boolean
   onClose: () => void
   onSuccess: () => void
+  userId: string
   horario?: Horario | null
 }
 
 type Asignatura = {
   id: string
   nombre: string
-  curso: string
+  curso: number
 }
 
 const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
 
-export default function ModalHorario({ visible, onClose, onSuccess, horario }: Props) {
+export default function ModalHorario({ visible, onClose, onSuccess, horario, userId }: Props) {
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
   const [asignaturaId, setAsignaturaId] = useState('')
   const [tipo, setTipo] = useState<'teórica' | 'laboratorio'>('teórica')
@@ -33,15 +44,24 @@ export default function ModalHorario({ visible, onClose, onSuccess, horario }: P
   const [dias, setDias] = useState<string[]>([])
 
   useEffect(() => {
-    supabase
-      .from('asignaturas')
-      .select('id, nombre, curso')
-      .order('curso')
-      .order('nombre')
-      .then(({ data }) => {
-        if (data) setAsignaturas(data)
-      })
-  }, [])
+    const cargarAsignaturas = async () => {
+      if (!userId) return
+      const q = query(
+        collection(db, 'asignaturas'),
+        where('user_id', '==', userId),
+        orderBy('curso'),
+        orderBy('nombre')
+      )
+      const snapshot = await getDocs(q)
+      const data = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<Asignatura, 'id'>),
+      }))
+      setAsignaturas(data)
+    }
+
+    cargarAsignaturas()
+  }, [userId])
 
   useEffect(() => {
     if (horario) {
@@ -79,38 +99,32 @@ export default function ModalHorario({ visible, onClose, onSuccess, horario }: P
       return
     }
 
-    const { data } = await supabase.auth.getSession()
-    const user_id = data.session?.user?.id
-    if (!user_id) return
+    if (!userId) return
 
     const payload = {
-      user_id,
+      user_id: userId,
       asignatura_id: asignaturaId,
       tipo,
       hora,
       dias,
     }
 
-    let error
-    if (horario?.id) {
-      ;({ error } = await supabase
-        .from('horario')
-        .update(payload)
-        .eq('id', horario.id))
-    } else {
-      ;({ error } = await supabase.from('horario').insert(payload))
-    }
+    try {
+      if (horario?.id) {
+        await updateDoc(doc(db, 'horario', horario.id), payload)
+      } else {
+        await addDoc(collection(db, 'horario'), payload)
+      }
 
-    if (error) {
-      toast.error('Error al guardar', {
-        style: { background: '#1a1a1a', color: '#fff' },
-      })
-    } else {
       toast.success(horario?.id ? 'Horario actualizado' : 'Horario creado', {
         style: { background: '#1a1a1a', color: '#fff' },
       })
       onSuccess()
       onClose()
+    } catch (err) {
+      toast.error('Error al guardar', {
+        style: { background: '#1a1a1a', color: '#fff' },
+      })
     }
   }
 
@@ -168,31 +182,31 @@ export default function ModalHorario({ visible, onClose, onSuccess, horario }: P
             </div>
 
             <div className="mb-3">
-                <label className="form-label">Días</label>
-                <div className="d-flex gap-2 flex-wrap">
-                    {diasSemana.map((dia) => {
-                    const abrev = dia.slice(0, 3).toUpperCase()
-                    const activo = dias.includes(dia)
-                    return (
-                        <button
-                        key={dia}
-                        type="button"
-                        onClick={() => toggleDia(dia)}
-                        className={`btn btn-sm rounded-circle d-flex justify-content-center align-items-center ${
-                            activo ? 'btn-primary' : 'btn-outline-secondary'
-                        }`}
-                        style={{
-                            width: '40px',
-                            height: '40px',
-                            fontWeight: 'bold',
-                            padding: 0,
-                        }}
-                        >
-                        {abrev}
-                        </button>
-                    )
-                    })}
-                </div>
+              <label className="form-label">Días</label>
+              <div className="d-flex gap-2 flex-wrap">
+                {diasSemana.map((dia) => {
+                  const abrev = dia.slice(0, 3).toUpperCase()
+                  const activo = dias.includes(dia)
+                  return (
+                    <button
+                      key={dia}
+                      type="button"
+                      onClick={() => toggleDia(dia)}
+                      className={`btn btn-sm rounded-circle d-flex justify-content-center align-items-center ${
+                        activo ? 'btn-primary' : 'btn-outline-secondary'
+                      }`}
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        fontWeight: 'bold',
+                        padding: 0,
+                      }}
+                    >
+                      {abrev}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="d-flex justify-content-center gap-2 mt-4">

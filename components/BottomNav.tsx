@@ -1,28 +1,22 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { auth } from '@/lib/firebaseClient'
 import { useRouter } from 'next/router'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faBook, faChartColumn, faClock, faHome, faTasks } from '@fortawesome/free-solid-svg-icons'
+import { onAuthStateChanged } from 'firebase/auth'
 
 export default function BottomNav() {
   const [show, setShow] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    const comprobarSesion = async () => {
-      const { data } = await supabase.auth.getSession()
-      setShow(!!data.session?.user)
-    }
-
-    comprobarSesion()
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setShow(!!session?.user)
+    setShow(!!auth.currentUser)
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setShow(!!user)
     })
 
-    return () => {
-      listener.subscription.unsubscribe()
-    }
+    return () => unsubscribe()
   }, [])
 
   if (!show) return null
@@ -57,35 +51,35 @@ export default function BottomNav() {
     >
       <Link href="/" style={router.pathname === '/' ? { ...linkStyle, ...activeStyle } : linkStyle}>
         <div className="text-center">
-          <FontAwesomeIcon icon="home" size="lg" />
+          <FontAwesomeIcon icon={faHome} size="lg" />
           <div>Inicio</div>
         </div>
       </Link>
 
       <Link href="/horarios" style={router.pathname === '/horarios' ? { ...linkStyle, ...activeStyle } : linkStyle}>
         <div className="text-center">
-          <FontAwesomeIcon icon="clock" size="lg" />
+          <FontAwesomeIcon icon={faClock} size="lg" />
           <div>Horarios</div>
         </div> 
       </Link>
 
       <Link href="/tareas" style={router.pathname === '/tareas' ? { ...linkStyle, ...activeStyle } : linkStyle}>
         <div className="text-center">
-          <FontAwesomeIcon icon="tasks" size="lg" />
+          <FontAwesomeIcon icon={faTasks} size="lg" />
           <div>Tareas</div>
         </div>
       </Link>
 
       <Link href="/notas" style={router.pathname === '/notas' ? { ...linkStyle, ...activeStyle } : linkStyle}>
         <div className="text-center">
-          <FontAwesomeIcon icon="chart-column" size="lg" />
+          <FontAwesomeIcon icon={faChartColumn} size="lg" />
           <div>Notas</div>
         </div>
       </Link>
 
       <Link href="/asignaturas" style={router.pathname === '/asignaturas' ? { ...linkStyle, ...activeStyle } : linkStyle}>
         <div className="text-center">
-          <FontAwesomeIcon icon="book" size="lg" />
+          <FontAwesomeIcon icon={faBook} size="lg" />
           <div>Asignaturas</div>
         </div>
       </Link>

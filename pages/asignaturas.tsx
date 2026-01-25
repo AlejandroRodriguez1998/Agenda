@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
+import { auth, db } from '@/lib/firebaseClient'
 import ModalAsignatura from '@/components/ModalAsignatura'
 import TopNav from '@/components/TopNav'
 import Swal from 'sweetalert2'
 import Head from 'next/head'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faTrash } from '@fortawesome/free-solid-svg-icons'
+import { collection, deleteDoc, doc, getDocs, orderBy, query, where } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 
 type Asignatura = {
   id: string
   nombre: string
   color?: string
-  curso: string
+  curso: number
 }
 
 export default function AsignaturasPage() {
@@ -20,30 +22,36 @@ export default function AsignaturasPage() {
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
   const [cargando, setCargando] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    const cargar = async () => {
-      const { data } = await supabase.auth.getSession()
-      if (!data.session?.user) {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
         router.push('/login')
         return
       }
 
-      await cargarAsignaturas()
-    }
+      setUserId(user.uid)
+      await cargarAsignaturas(user.uid)
+    })
 
-    cargar()
+    return () => unsubscribe()
   }, [router])
 
-  const cargarAsignaturas = async () => {
+  const cargarAsignaturas = async (uid: string) => {
     setCargando(true)
-    const { data } = await supabase
-      .from('asignaturas')
-      .select('*')
-      .order('curso', { ascending: true })
-      .order('nombre', { ascending: true })
-
-    if (data) setAsignaturas(data)
+    const q = query(
+      collection(db, 'asignaturas'),
+      where('user_id', '==', uid),
+      orderBy('curso', 'asc'),
+      orderBy('nombre', 'asc')
+    )
+    const snapshot = await getDocs(q)
+    const data = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Asignatura, 'id'>),
+    }))
+    setAsignaturas(data)
     setCargando(false)
   }
 
@@ -60,8 +68,8 @@ export default function AsignaturasPage() {
     })
 
     if (confirmar.isConfirmed) {
-      const { error } = await supabase.from('asignaturas').delete().eq('id', id)
-      if (!error) await cargarAsignaturas()
+      await deleteDoc(doc(db, 'asignaturas', id))
+      if (userId) await cargarAsignaturas(userId)
     }
   }
 
@@ -116,11 +124,14 @@ export default function AsignaturasPage() {
           ))
         )}
 
-        <ModalAsignatura
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
-          onSuccess={cargarAsignaturas}
-        />
+        {userId && (
+          <ModalAsignatura
+            visible={modalVisible}
+            onClose={() => setModalVisible(false)}
+            onSuccess={() => userId && cargarAsignaturas(userId)}
+            userId={userId}
+          />
+        )}
       </div>
     </>
   )

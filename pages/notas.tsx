@@ -2,19 +2,29 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
+import { auth, db } from '@/lib/firebaseClient'
 import TopNav from '@/components/TopNav'
 import ModalNota from '@/components/ModalNota'
 import Swal from 'sweetalert2'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import Head from 'next/head'
 import { faTrash } from '@fortawesome/free-solid-svg-icons'
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  where,
+} from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 
 type Asignatura = {
   id: string
   nombre: string
   color: string
-  curso: string
+  curso: number
 }
 
 type Nota = {
@@ -34,61 +44,82 @@ export default function NotasPage() {
   const [notasPorAsignatura, setNotasPorAsignatura] = useState<Record<string, Nota[]>>({})
   const [cargando, setCargando] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    const verificarSesion = async () => {
-      const { data } = await supabase.auth.getSession()
-      if (!data.session?.user) {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
         router.push('/login')
       } else {
-        await cargarAsignaturasYNotas()
+        setUserId(user.uid)
+        await cargarAsignaturasYNotas(user.uid)
       }
-    }
+    })
 
-    verificarSesion()
+    return () => unsubscribe()
   }, [router])
 
-  const cargarAsignaturasYNotas = async () => {
+  const cargarAsignaturasYNotas = async (uid: string) => {
     setCargando(true)
 
-    const { data: asignaturasData } = await supabase
-      .from('asignaturas')
-      .select('*')
-      .order('curso', { ascending: true })
-      .order('nombre', { ascending: true })
+    const asignaturasSnapshot = await getDocs(
+      query(
+        collection(db, 'asignaturas'),
+        where('user_id', '==', uid),
+        orderBy('curso', 'asc'),
+        orderBy('nombre', 'asc')
+      )
+    )
+    const asignaturasData = asignaturasSnapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Asignatura, 'id'>),
+    }))
 
-    const { data: notasData } = await supabase
-      .from('notas_academicas')
-      .select('*')
-      .order('created_at', { ascending: true })
+    const notasSnapshot = await getDocs(
+      query(
+        collection(db, 'notas_academicas'),
+        where('user_id', '==', uid),
+        orderBy('created_at', 'asc')
+      )
+    )
+    const notasData = notasSnapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Nota, 'id'>),
+    }))
 
-    if (asignaturasData && notasData) {
-      setAsignaturas(asignaturasData)
+    setAsignaturas(asignaturasData)
 
-      const agrupadas = asignaturasData.reduce((acc, asignatura) => {
-        acc[asignatura.id] = notasData.filter(n => n.asignatura_id === asignatura.id)
-        return acc
-      }, {} as Record<string, Nota[]>)
+    const agrupadas = asignaturasData.reduce((acc, asignatura) => {
+      acc[asignatura.id] = notasData.filter(n => n.asignatura_id === asignatura.id)
+      return acc
+    }, {} as Record<string, Nota[]>)
 
-      setNotasPorAsignatura(agrupadas)
+    setNotasPorAsignatura(agrupadas)
 
-      if (seleccionada) {
-        setNotas(agrupadas[seleccionada] || [])
-      }
+    if (seleccionada) {
+      setNotas(agrupadas[seleccionada] || [])
     }
 
     setCargando(false)
   }
 
-  const cargarNotas = async (asignaturaId: string) => {
+  const cargarNotas = async (uid: string, asignaturaId: string) => {
     setCargando(true)
-    const { data } = await supabase
-      .from('notas_academicas')
-      .select('*')
-      .eq('asignatura_id', asignaturaId)
-      .order('created_at', { ascending: true })
+    const snapshot = await getDocs(
+      query(
+        collection(db, 'notas_academicas'),
+        where('user_id', '==', uid),
+        where('asignatura_id', '==', asignaturaId),
+        orderBy('created_at', 'asc')
+      )
+    )
 
-    if (data) setNotas(data)
+    const data = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Nota, 'id'>),
+    }))
+
+    setNotas(data)
     setCargando(false)
   }
 
@@ -105,8 +136,8 @@ export default function NotasPage() {
     })
 
     if (confirmar.isConfirmed) {
-      await supabase.from('notas_academicas').delete().eq('id', id)
-      await cargarAsignaturasYNotas()
+      await deleteDoc(doc(db, 'notas_academicas', id))
+      if (userId) await cargarAsignaturasYNotas(userId)
     }
   }
 
@@ -153,7 +184,7 @@ export default function NotasPage() {
         <div className="mb-4">
           <select className="form-select" onChange={(e) => {
             setSeleccionada(e.target.value)
-            if (e.target.value) cargarNotas(e.target.value)
+            if (e.target.value && userId) cargarNotas(userId, e.target.value)
           }} value={seleccionada || ''}>
             <option value="">Selecciona una asignatura</option>
             {Object.entries(asignaturasPorCurso).map(([curso, lista]) => (
@@ -237,12 +268,15 @@ export default function NotasPage() {
                 </div>
               </div>
             )}
-            <ModalNota
-              visible={modalVisible}
-              asignaturaId={seleccionada}
-              onClose={() => setModalVisible(false)}
-              onSuccess={cargarAsignaturasYNotas}
-            />
+            {userId && (
+              <ModalNota
+                visible={modalVisible}
+                asignaturaId={seleccionada}
+                onClose={() => setModalVisible(false)}
+                onSuccess={() => userId && cargarAsignaturasYNotas(userId)}
+                userId={userId}
+              />
+            )}
           </>
         ) : (
           <>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { db, auth } from '@/lib/firebaseClient'
 import { useRouter } from 'next/router'
 import TopNav from '@/components/TopNav'
 import ModalHorario from '@/components/ModalHorario'
@@ -7,6 +7,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
 import Swal from 'sweetalert2'
 import Head from 'next/head'
+import { collection, deleteDoc, doc, getDocs, orderBy, query, where } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 
 type Horario = {
   id: string
@@ -38,43 +40,57 @@ export default function HorariosPage() {
   const [cargando, setCargando] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
   const [horarioEditando, setHorarioEditando] = useState<Horario | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [diaSeleccionado, setDiaSeleccionado] = useState<string>(() => {
     const hoy = new Date().toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase()
     return diasSemana.includes(hoy) ? hoy : 'todos'
   })
 
   useEffect(() => {
-    const verificarSesion = async () => {
-      const { data } = await supabase.auth.getSession()
-      const user = data.session?.user
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.push('/login')
       } else {
+        setUserId(user.uid)
         setUsuarioVerificado(true)
-        await cargarHorarios()
+        await cargarHorarios(user.uid)
       }
-    }
+    })
 
-    verificarSesion()
+    return () => unsubscribe()
   }, [router])
 
-  const cargarHorarios = async () => {
+  const cargarHorarios = async (uid: string) => {
     setCargando(true)
 
-    const { data: horariosData } = await supabase
-      .from('horario')
-      .select('id, asignatura_id, tipo, hora, dias, asignatura:asignaturas(id, nombre, color)')
-      .order('hora', { ascending: true })
+    const horariosSnapshot = await getDocs(
+      query(collection(db, 'horario'), where('user_id', '==', uid), orderBy('hora', 'asc'))
+    )
+    const asignaturasSnapshot = await getDocs(
+      query(collection(db, 'asignaturas'), where('user_id', '==', uid))
+    )
 
-    if (horariosData) {
-      setHorarios(
-        (horariosData as unknown as Horario[]).map((h) => ({
-          ...h,
-          asignatura: Array.isArray(h.asignatura) ? h.asignatura[0] : h.asignatura,
-        }))
-      )
-    }
+    const asignaturasMap = new Map(
+      asignaturasSnapshot.docs.map((docSnap) => [
+        docSnap.id,
+        { id: docSnap.id, ...(docSnap.data() as { nombre: string; color?: string }) },
+      ])
+    )
 
+    const horariosData = horariosSnapshot.docs.map((docSnap) => {
+      const data = docSnap.data() as { asignatura_id: string; tipo: 'teórica' | 'laboratorio'; hora: string; dias: string[] }
+      const asignatura = asignaturasMap.get(data.asignatura_id)
+      return {
+        id: docSnap.id,
+        asignatura_id: data.asignatura_id,
+        tipo: data.tipo,
+        hora: data.hora,
+        dias: data.dias,
+        asignatura,
+      }
+    })
+
+    setHorarios(horariosData)
     setCargando(false)
   }
 
@@ -89,8 +105,8 @@ export default function HorariosPage() {
     })
 
     if (confirmar.isConfirmed) {
-      await supabase.from('horario').delete().eq('id', id)
-      await cargarHorarios()
+      await deleteDoc(doc(db, 'horario', id))
+      if (userId) await cargarHorarios(userId)
     }
   }
 
@@ -201,12 +217,15 @@ export default function HorariosPage() {
         )}
       </div>
 
-      <ModalHorario
-        visible={modalVisible}
-        horario={horarioEditando}
-        onClose={() => setModalVisible(false)}
-        onSuccess={cargarHorarios}
-      />
+      {userId && (
+        <ModalHorario
+          visible={modalVisible}
+          horario={horarioEditando}
+          onClose={() => setModalVisible(false)}
+          onSuccess={() => userId && cargarHorarios(userId)}
+          userId={userId}
+        />
+      )}
     </>
   )
 }
