@@ -194,7 +194,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(1200px 600px at 50% 20%, #242424 0%, #0f0f0f 55%, #0a0a0a 100%);
+  background: radial-gradient(1200px 600px at 50% 20%, #4a4242 0%, #352f2f 55%, #1c1818 100%);
   color: #ffffff;
   z-index: 2000;
 }
