@@ -187,3 +187,59 @@ html, body {
   overflow: hidden;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
+
+.app-splash {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(1200px 600px at 50% 20%, #242424 0%, #0f0f0f 55%, #0a0a0a 100%);
+  color: #ffffff;
+  z-index: 2000;
+}
+
+.app-splash-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  animation: splash-fade-in 500ms ease-out both;
+}
+
+.app-splash-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.app-splash-subtitle {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.app-splash-inner img {
+  animation: splash-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes splash-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes splash-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
