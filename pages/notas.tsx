@@ -344,19 +344,13 @@ export default function NotasPage() {
                     style={{
                       position: 'absolute',
                       left: '50%',
-                      bottom: 0,
-                      transform: 'translateX(-50%)',
-                      width: 120,
-                      height: 120,
-                      borderRadius: '50%',
-                      backgroundColor: '#0d6efd',
+                      top: '50%',
+                      transform: 'translate(-50%, -45%)',
                       color: 'white',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      fontSize: 28,
+                      fontSize: 30,
                       fontWeight: 'bold',
-                      boxShadow: '0 0 20px rgba(13,110,253,0.35)',
+                      letterSpacing: '0.02em',
+                      textShadow: '0 6px 18px rgba(0,0,0,0.35)',
                     }}
                   >
                     {mediaGlobal}
