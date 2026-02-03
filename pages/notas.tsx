@@ -167,10 +167,18 @@ export default function NotasPage() {
       ? (notasFinales.reduce((acc, n) => acc + n.final, 0) / notasFinales.length).toFixed(2)
       : null
 
-  const totalAsignaturas = asignaturas.length
-  const asignaturasConNota = notasFinales.length
-  const progresoAsignaturas =
-    totalAsignaturas > 0 ? asignaturasConNota / totalAsignaturas : 0
+  const cursos = [1, 2, 3, 4]
+  const progresoPorCurso = cursos.map((curso) => {
+    const asignaturasCurso = asignaturas.filter((a) => a.curso === curso)
+    const total = asignaturasCurso.length
+    const conNota = asignaturasCurso.filter((a) => (notasPorAsignatura[a.id] || []).length > 0).length
+    return {
+      curso,
+      total,
+      conNota,
+      progreso: total > 0 ? conNota / total : 0,
+    }
+  })
 
   const asignaturasPorCurso = asignaturas.reduce((acc, a) => {
     if (!acc[a.curso]) acc[a.curso] = []
@@ -287,32 +295,54 @@ export default function NotasPage() {
           <>
             {mediaGlobal ? (
               <div className="text-center mb-4">
-                <div
-                  style={{
-                    width: 140,
-                    height: 140,
-                    borderRadius: '50%',
-                    padding: 6,
-                    margin: '0 auto 1rem',
-                    background: `conic-gradient(from -90deg,
-                      #ff4d4f 0%,
-                      #ff7a45 16%,
-                      #fadb14 33%,
-                      #52c41a 50%,
-                      #13c2c2 66%,
-                      #1677ff 83%,
-                      #9254de 100%)`,
-                    position: 'relative',
-                    opacity: progresoAsignaturas > 0 ? 1 : 0.35,
-                    clipPath: `polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 50% 0%)`,
-                    maskImage: `conic-gradient(#000 0deg ${progresoAsignaturas * 360}deg, transparent ${progresoAsignaturas * 360}deg)`,
-                    WebkitMaskImage: `conic-gradient(#000 0deg ${progresoAsignaturas * 360}deg, transparent ${progresoAsignaturas * 360}deg)`,
-                  }}
-                >
+                <div style={{ width: 160, height: 160, margin: '0 auto 1rem', position: 'relative' }}>
+                  <svg width="160" height="160" viewBox="0 0 160 160" style={{ display: 'block', margin: '0 auto' }}>
+                    {(() => {
+                      const r = 62
+                      const cx = 80
+                      const cy = 80
+                      const circumference = 2 * Math.PI * r
+                      const segment = circumference / 4
+                      const colors = ['#ff4d4f', '#fadb14', '#52c41a', '#1677ff']
+                      return progresoPorCurso.map((item, i) => {
+                        const dashBase = `${segment} ${circumference - segment}`
+                        const dashProgress = `${segment * item.progreso} ${circumference - segment * item.progreso}`
+                        const offset = -i * segment
+                        return (
+                          <g key={item.curso}>
+                            <circle
+                              cx={cx}
+                              cy={cy}
+                              r={r}
+                              fill="none"
+                              stroke="rgba(255,255,255,0.12)"
+                              strokeWidth="8"
+                              strokeDasharray={dashBase}
+                              strokeDashoffset={offset}
+                              transform={`rotate(-90 ${cx} ${cy})`}
+                            />
+                            <circle
+                              cx={cx}
+                              cy={cy}
+                              r={r}
+                              fill="none"
+                              stroke={colors[i]}
+                              strokeWidth="8"
+                              strokeLinecap="round"
+                              strokeDasharray={dashProgress}
+                              strokeDashoffset={offset}
+                              transform={`rotate(-90 ${cx} ${cy})`}
+                              style={{ filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.35))' }}
+                            />
+                          </g>
+                        )
+                      })
+                    })()}
+                  </svg>
                   <div
                     style={{
-                      width: '100%',
-                      height: '100%',
+                      position: 'absolute',
+                      inset: 18,
                       borderRadius: '50%',
                       backgroundColor: '#0d6efd',
                       color: 'white',
@@ -328,9 +358,14 @@ export default function NotasPage() {
                   </div>
                 </div>
                 <p className="text-white">Media global de todas las asignaturas</p>
-                <p className="text-white-50 small mb-0">
-                  Progreso: {asignaturasConNota}/{totalAsignaturas} con nota
-                </p>
+                <div className="d-flex flex-wrap justify-content-center gap-3 text-white-50 small">
+                  {progresoPorCurso.map((item, idx) => (
+                    <div key={item.curso}>
+                      <span style={{ color: ['#ff4d4f', '#fadb14', '#52c41a', '#1677ff'][idx] }}>●</span>{' '}
+                      {item.curso}º: {item.conNota}/{item.total}
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
               <p className="text-white text-center">No hay notas aún.</p>
