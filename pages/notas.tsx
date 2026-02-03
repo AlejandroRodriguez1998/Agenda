@@ -295,19 +295,22 @@ export default function NotasPage() {
           <>
             {mediaGlobal ? (
               <div className="text-center mb-4">
-                <div style={{ width: 200, height: 200, margin: '0 auto 1rem', position: 'relative' }}>
-                  <svg width="200" height="200" viewBox="0 0 200 200" style={{ display: 'block', margin: '0 auto' }}>
+                <div style={{ width: 220, height: 140, margin: '0 auto 1rem', position: 'relative' }}>
+                  <svg width="220" height="140" viewBox="0 0 220 140" style={{ display: 'block', margin: '0 auto' }}>
                     {(() => {
-                      const cx = 100
-                      const cy = 100
+                      const cx = 110
+                      const cy = 120
                       const stroke = 10
                       const gap = 6
-                      const baseRadius = 72
+                      const baseRadius = 56
                       const colors = ['#ff4d4f', '#fadb14', '#52c41a', '#1677ff']
+                      const half = Math.PI
                       return progresoPorCurso.map((item, i) => {
-                        const r = baseRadius + i * (stroke + gap)
+                        const orderIndex = (progresoPorCurso.length - 1) - i
+                        const r = baseRadius + orderIndex * (stroke + gap)
                         const circumference = 2 * Math.PI * r
-                        const dashProgress = `${circumference * item.progreso} ${circumference}`
+                        const halfCirc = circumference * 0.5
+                        const dashProgress = `${halfCirc * item.progreso} ${circumference}`
                         return (
                           <g key={item.curso}>
                             <circle
@@ -317,7 +320,8 @@ export default function NotasPage() {
                               fill="none"
                               stroke="rgba(255,255,255,0.12)"
                               strokeWidth={stroke}
-                              transform={`rotate(-90 ${cx} ${cy})`}
+                              strokeDasharray={`${halfCirc} ${circumference}`}
+                              transform={`rotate(180 ${cx} ${cy})`}
                             />
                             <circle
                               cx={cx}
@@ -328,7 +332,7 @@ export default function NotasPage() {
                               strokeWidth={stroke}
                               strokeLinecap="round"
                               strokeDasharray={dashProgress}
-                              transform={`rotate(-90 ${cx} ${cy})`}
+                              transform={`rotate(180 ${cx} ${cy})`}
                               style={{ filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.35))' }}
                             />
                           </g>
@@ -339,7 +343,11 @@ export default function NotasPage() {
                   <div
                     style={{
                       position: 'absolute',
-                      inset: 32,
+                      left: '50%',
+                      bottom: 0,
+                      transform: 'translateX(-50%)',
+                      width: 120,
+                      height: 120,
                       borderRadius: '50%',
                       backgroundColor: '#0d6efd',
                       color: 'white',
