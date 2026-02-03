@@ -167,6 +167,11 @@ export default function NotasPage() {
       ? (notasFinales.reduce((acc, n) => acc + n.final, 0) / notasFinales.length).toFixed(2)
       : null
 
+  const totalAsignaturas = asignaturas.length
+  const asignaturasConNota = notasFinales.length
+  const progresoAsignaturas =
+    totalAsignaturas > 0 ? asignaturasConNota / totalAsignaturas : 0
+
   const asignaturasPorCurso = asignaturas.reduce((acc, a) => {
     if (!acc[a.curso]) acc[a.curso] = []
     acc[a.curso].push(a)
@@ -282,22 +287,50 @@ export default function NotasPage() {
           <>
             {mediaGlobal ? (
               <div className="text-center mb-4">
-                <div style={{
-                  width: 120,
-                  height: 120,
-                  borderRadius: '50%',
-                  backgroundColor: '#0d6efd',
-                  color: 'white',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  fontSize: 28,
-                  fontWeight: 'bold',
-                  margin: '0 auto 1rem',
-                }}>
-                  {mediaGlobal}
+                <div
+                  style={{
+                    width: 140,
+                    height: 140,
+                    borderRadius: '50%',
+                    padding: 6,
+                    margin: '0 auto 1rem',
+                    background: `conic-gradient(from -90deg,
+                      #ff4d4f 0%,
+                      #ff7a45 16%,
+                      #fadb14 33%,
+                      #52c41a 50%,
+                      #13c2c2 66%,
+                      #1677ff 83%,
+                      #9254de 100%)`,
+                    position: 'relative',
+                    opacity: progresoAsignaturas > 0 ? 1 : 0.35,
+                    clipPath: `polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 50% 0%)`,
+                    maskImage: `conic-gradient(#000 0deg ${progresoAsignaturas * 360}deg, transparent ${progresoAsignaturas * 360}deg)`,
+                    WebkitMaskImage: `conic-gradient(#000 0deg ${progresoAsignaturas * 360}deg, transparent ${progresoAsignaturas * 360}deg)`,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      backgroundColor: '#0d6efd',
+                      color: 'white',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      fontSize: 28,
+                      fontWeight: 'bold',
+                      boxShadow: '0 0 20px rgba(13,110,253,0.35)',
+                    }}
+                  >
+                    {mediaGlobal}
+                  </div>
                 </div>
                 <p className="text-white">Media global de todas las asignaturas</p>
+                <p className="text-white-50 small mb-0">
+                  Progreso: {asignaturasConNota}/{totalAsignaturas} con nota
+                </p>
               </div>
             ) : (
               <p className="text-white text-center">No hay notas aún.</p>
