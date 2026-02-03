@@ -344,7 +344,7 @@ export default function NotasPage() {
                     style={{
                       position: 'absolute',
                       left: '50%',
-                      top: '62%',
+                      top: '79%',
                       transform: 'translate(-50%, -50%)',
                       color: 'white',
                       fontSize: 30,
