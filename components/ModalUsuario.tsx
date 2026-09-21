@@ -1,5 +1,6 @@
 // components/UserModal.tsx
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { auth } from '@/lib/firebaseClient'
 import Swal from 'sweetalert2'
 import toast from 'react-hot-toast'
@@ -116,6 +117,46 @@ export default function ModalUsuario() {
   }
 
   const handleClose = () => setVisible(false)
+  const modal = (
+    <div
+      className="modal fade show d-block app-modal-layer"
+      tabIndex={-1}
+      onClick={handleClose}
+    >
+      <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-content bg-dark text-white">
+          <div className="modal-body">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="modal-title mb-0">Usuario</h5>
+              <button className="btn btn-outline-light" onClick={handleClose} aria-label="Cerrar">
+                ×
+              </button>
+            </div>
+
+            <h4 className="text-white text-center my-4">
+              <strong> {user?.email ?? ''}</strong>
+            </h4>
+
+            <label className="form-label">Nueva contrasena</label>
+            <input
+              type="password"
+              className="form-control mb-3"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="********"
+            />
+
+            <button className="btn btn-primary w-100 mb-2" onClick={cambiarContrasena}>
+              Cambiar contrasena
+            </button>
+            <button className="btn btn-secondary w-100" onClick={cerrarSesion}>
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <>
@@ -123,44 +164,7 @@ export default function ModalUsuario() {
         <FontAwesomeIcon icon={faCog} size="lg" />
       </button>
 
-      {visible && (
-        <div
-          className="modal fade show d-block"
-          tabIndex={-1}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={handleClose}
-        >
-          <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-content bg-dark text-white">
-              <div className="modal-body">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h5 className="modal-title mb-0">👤 Usuario</h5>
-                  <button className="btn btn-outline-light" onClick={cerrarSesion}>
-                    Cerrar sesión
-                  </button>
-                </div>
-
-                <h4 className="text-white text-center my-4">
-                  <strong> {user?.email ?? ''}</strong>
-                </h4>
-
-                <label className="form-label">Nueva contrasena</label>
-                <input
-                  type="password"
-                  className="form-control mb-3"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="********"
-                />
-
-                <button className="btn btn-primary w-100 mb-2" onClick={cambiarContrasena}>
-                  Cambiar contrasena
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {visible && createPortal(modal, document.body)}
     </>
   )
 }

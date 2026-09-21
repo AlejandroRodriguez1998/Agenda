@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { db, auth } from '@/lib/firebaseClient'
 import { useRouter } from 'next/router'
-import TopNav from '@/components/TopNav'
+import AppShell from '@/components/AppShell'
 import ModalHorario from '@/components/ModalHorario'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faCalendarDays, faClock, faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
 import Swal from 'sweetalert2'
+import toast from 'react-hot-toast'
 import Head from 'next/head'
 import { collection, deleteDoc, doc, getDocs, orderBy, query, where } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
@@ -41,6 +42,7 @@ export default function HorariosPage() {
   const [modalVisible, setModalVisible] = useState(false)
   const [horarioEditando, setHorarioEditando] = useState<Horario | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [diaSeleccionado, setDiaSeleccionado] = useState<string>(() => {
     const hoy = new Date().toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase()
     return diasSemana.includes(hoy) ? hoy : 'todos'
@@ -62,36 +64,43 @@ export default function HorariosPage() {
 
   const cargarHorarios = async (uid: string) => {
     setCargando(true)
+    setError(null)
 
-    const horariosSnapshot = await getDocs(
-      query(collection(db, 'horario'), where('user_id', '==', uid), orderBy('hora', 'asc'))
-    )
-    const asignaturasSnapshot = await getDocs(
-      query(collection(db, 'asignaturas'), where('user_id', '==', uid))
-    )
+    try {
+      const horariosSnapshot = await getDocs(
+        query(collection(db, 'horario'), where('user_id', '==', uid), orderBy('hora', 'asc'))
+      )
+      const asignaturasSnapshot = await getDocs(
+        query(collection(db, 'asignaturas'), where('user_id', '==', uid))
+      )
 
-    const asignaturasMap = new Map(
-      asignaturasSnapshot.docs.map((docSnap) => [
-        docSnap.id,
-        { id: docSnap.id, ...(docSnap.data() as { nombre: string; color?: string }) },
-      ])
-    )
+      const asignaturasMap = new Map(
+        asignaturasSnapshot.docs.map((docSnap) => [
+          docSnap.id,
+          { id: docSnap.id, ...(docSnap.data() as { nombre: string; color?: string }) },
+        ])
+      )
 
-    const horariosData = horariosSnapshot.docs.map((docSnap) => {
-      const data = docSnap.data() as { asignatura_id: string; tipo: 'teórica' | 'laboratorio'; hora: string; dias: string[] }
-      const asignatura = asignaturasMap.get(data.asignatura_id)
-      return {
-        id: docSnap.id,
-        asignatura_id: data.asignatura_id,
-        tipo: data.tipo,
-        hora: data.hora,
-        dias: data.dias,
-        asignatura,
-      }
-    })
+      const horariosData = horariosSnapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as { asignatura_id: string; tipo: 'teórica' | 'laboratorio'; hora: string; dias: string[] }
+        const asignatura = asignaturasMap.get(data.asignatura_id)
+        return {
+          id: docSnap.id,
+          asignatura_id: data.asignatura_id,
+          tipo: data.tipo,
+          hora: data.hora,
+          dias: data.dias,
+          asignatura,
+        }
+      })
 
-    setHorarios(horariosData)
-    setCargando(false)
+      setHorarios(horariosData)
+    } catch (err) {
+      const firebaseError = err as { message?: string }
+      setError(firebaseError.message || 'No se pudieron cargar los horarios.')
+    } finally {
+      setCargando(false)
+    }
   }
 
   const eliminarHorario = async (id: string) => {
@@ -105,8 +114,12 @@ export default function HorariosPage() {
     })
 
     if (confirmar.isConfirmed) {
-      await deleteDoc(doc(db, 'horario', id))
-      if (userId) await cargarHorarios(userId)
+      try {
+        await deleteDoc(doc(db, 'horario', id))
+        if (userId) await cargarHorarios(userId)
+      } catch (err) {
+        toast.error('No se pudo eliminar el horario')
+      }
     }
   }
 
@@ -118,29 +131,27 @@ export default function HorariosPage() {
   const renderHorario = (h: Horario) => (
     <div
       key={h.id}
-      className="d-flex justify-content-between align-items-center p-3 rounded text-white mb-2"
-      style={{
-        backgroundColor: h.asignatura?.color || '#343a40',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-      }}
+      className="schedule-row"
+      style={{ '--item-color': h.asignatura?.color || '#6c8cff' } as React.CSSProperties}
     >
       <div>
+        <span className="color-dot" />
         <strong>{h.asignatura?.nombre || 'Asignatura'}</strong>
-        <div className="small">{h.tipo.charAt(0).toUpperCase() + h.tipo.slice(1)} · {h.hora}</div>
+        <p>{h.tipo.charAt(0).toUpperCase() + h.tipo.slice(1)} · {h.hora}</p>
       </div>
-      <div>
+      <div className="row-actions">
         <button
-          className="btn btn-sm btn-outline-light me-2"
           onClick={() => {
             setHorarioEditando(h)
             setModalVisible(true)
           }}
+          aria-label="Editar horario"
         >
           <FontAwesomeIcon icon={faPen} />
         </button>
         <button
-          className="btn btn-sm btn-outline-light"
           onClick={() => eliminarHorario(h.id)}
+          aria-label="Eliminar horario"
         >
           <FontAwesomeIcon icon={faTrash} />
         </button>
@@ -149,73 +160,76 @@ export default function HorariosPage() {
   )
 
   if (!usuarioVerificado) {
-    return <p className="p-4 text-white">Verificando sesión...</p>
+    return <p className="app-state">Verificando sesión...</p>
   }
 
   return (
     <>
       <Head>
-        <title>Horarios</title>
+        <title>Horario</title>
       </Head>
 
-      <TopNav
-        title="🕰️ Horarios"
-        onAddClick={() => {
-          setHorarioEditando(null)
-          setModalVisible(true)
-        }}
-      />
+      <AppShell title="Horario" eyebrow="Agenda académica" onAddClick={() => {
+        setHorarioEditando(null)
+        setModalVisible(true)
+      }}>
+      <main className="academic-page">
+        <section className="metric-grid">
+          <article className="metric-card">
+            <FontAwesomeIcon icon={faCalendarDays} />
+            <div><strong>{horarios.length}</strong><span>Bloques semanales</span></div>
+          </article>
+          <article className="metric-card">
+            <FontAwesomeIcon icon={faClock} />
+            <div><strong>{diasSemana.filter((dia) => horariosPorDia[dia]?.length).length}</strong><span>Días con clase</span></div>
+          </article>
+        </section>
 
-      <ul className="nav nav-tabs justify-content-center mb-3 small border border-0">
-        {['todos', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'].map((dia, idx) => {
-          const abreviado = idx === 0 ? 'Todos' : ['L', 'M', 'X', 'J', 'V', 'S', 'D'][idx - 1]
-          return (
-            <li key={dia} className="nav-item border-bottom">
-              <a
-                href="#"
-                className={`nav-link ${diaSeleccionado === dia ? 'active text-black' : 'text-white'}`}
-                onClick={(e) => {
-                  e.preventDefault()
-                  setDiaSeleccionado(dia)
-                }}>
-                <>
-                  <span className="d-inline d-sm-none">{abreviado}</span>
-                  <span className="d-none d-sm-inline">
-                    {idx === 0 ? 'Todos' : ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][idx - 1]}
-                  </span>
-                </>
-              </a>
-            </li>
-          )
-        })}
-      </ul>
+        <div className="filter-chips">
+          {['todos', ...diasSemana].map((dia, idx) => (
+            <button
+              key={dia}
+              className={diaSeleccionado === dia ? 'is-active' : ''}
+              onClick={() => setDiaSeleccionado(dia)}
+            >
+              {idx === 0 ? 'Todos' : dia.charAt(0).toUpperCase() + dia.slice(1)}
+            </button>
+          ))}
+        </div>
 
-      <div className="container mb-5 pb-5">
+        {error && <div className="error-panel"><strong>No se pudieron cargar los horarios</strong><p>{error}</p></div>}
         {cargando ? (
-          <div className="text-center mt-4">
-            <div className="spinner-border text-primary" role="status" />
-          </div>
+          <div className="app-state">Cargando horario...</div>
         ) : diaSeleccionado === 'todos' ? (
-          diasSemana.map((dia) => (
-            <div key={dia} className="mb-4">
-              <h5 className="text-white fw-bold mb-3 text-capitalize">{dia}</h5>
+          <section className="stack-list">
+            {diasSemana.map((dia) => (
+              <article key={dia} className="page-card">
+                <div className="card-heading">
+                  <div>
+                    <span className="soft-icon"><FontAwesomeIcon icon={faCalendarDays} /></span>
+                    <h2>{dia}</h2>
+                  </div>
+                  <span>{horariosPorDia[dia]?.length || 0} bloques</span>
+                </div>
               {horariosPorDia[dia]?.length > 0 ? (
                 horariosPorDia[dia].map(renderHorario)
               ) : (
-                <p className="text-white-50">No hay clases.</p>
+                <p className="empty-inline">No hay clases.</p>
               )}
-            </div>
-          ))
+              </article>
+            ))}
+          </section>
         ) : (
-          <div className="mb-4">
+          <section className="page-card">
             {horariosPorDia[diaSeleccionado]?.length > 0 ? (
               horariosPorDia[diaSeleccionado].map(renderHorario)
             ) : (
-              <p className="text-white-50">No hay clases.</p>
+              <p className="empty-inline">No hay clases.</p>
             )}
-          </div>
+          </section>
         )}
-      </div>
+      </main>
+      </AppShell>
 
       {userId && (
         <ModalHorario

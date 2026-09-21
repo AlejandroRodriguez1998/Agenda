@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '@/lib/firebaseClient'
 import SplashScreen from '@/components/SplashScreen'
+import { applyTheme, getStoredTheme } from '@/lib/theme'
 
 export default function App({ Component, pageProps }: AppProps) {
   const [isClient, setIsClient] = useState(false)
@@ -15,6 +16,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     setIsClient(true)
+    applyTheme(getStoredTheme())
   }, [])
 
   useEffect(() => {

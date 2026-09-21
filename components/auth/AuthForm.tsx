@@ -79,11 +79,45 @@ export default function AuthForm() {
       </Head>
 
       <div className={styles.wrapper}>
-        <form className={styles.form} onSubmit={handleSubmit}>
+        <header className={styles.publicNav}>
+          <button type="button" className={styles.brandButton} onClick={() => router.push('/')}>
+            <span className={styles.brandMark}>A</span>
+            <b>Agenda Académica</b>
+          </button>
+          <button type="button" className={styles.backButton} onClick={() => router.push('/')}>
+            Volver
+          </button>
+        </header>
+
+        <section className={styles.panel}>
+          <div className={styles.copy}>
+            <span>{isLogin ? 'Acceso privado' : 'Nueva cuenta'}</span>
+            <h1>{isLogin ? 'Bienvenido de nuevo' : 'Crea tu espacio académico'}</h1>
+            <p>
+              {isLogin
+                ? 'Accede a tus horarios, tareas y notas desde tu dashboard.'
+                : 'Empieza a organizar tus asignaturas, entregas y calificaciones.'}
+            </p>
+            <div className={styles.copyList}>
+              <div>
+                <strong>Horario</strong>
+                <span>Clases y eventos</span>
+              </div>
+              <div>
+                <strong>Tareas</strong>
+                <span>Pendientes claros</span>
+              </div>
+              <div>
+                <strong>Notas</strong>
+                <span>Medias por asignatura</span>
+              </div>
+            </div>
+          </div>
+
+          <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.title}>
-            {isLogin ? 'Bienvenido de nuevo,' : 'Bienvenido,'}
-            <br />
-            <span>{isLogin ? 'inicia sesión para continuar' : 'registrarse para continuar'}</span>
+            {isLogin ? 'Iniciar sesión' : 'Crear cuenta'}
+            <span>{isLogin ? 'Usa tu correo y contraseña' : 'Te enviaremos un correo de verificación'}</span>
           </div>
 
           <input
@@ -107,27 +141,20 @@ export default function AuthForm() {
           />
 
           <button type="submit" className={styles['button-confirm']}>
-            {isLogin ? 'Acceder' : 'Registrarse'} →
+            {isLogin ? 'Acceder' : 'Registrarse'}
           </button>
 
-          <p style={{ fontSize: '0.9rem', marginTop: '10px', color: 'black' }}>
+          <p className={styles.switchText}>
             {isLogin ? '¿No tienes cuenta?' : '¿Tienes una cuenta?'}{' '}
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              style={{
-                color: 'blue',
-                background: 'none',
-                border: 'none',
-                textDecoration: 'underline',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-              }}
             >
               {isLogin ? 'Registrarse' : 'Iniciar Sesión'}
             </button>
           </p>
         </form>
+        </section>
       </div>
     </>
   )

@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { auth, db } from '@/lib/firebaseClient'
-import TopNav from '@/components/TopNav'
+import AppShell from '@/components/AppShell'
 import ModalNota from '@/components/ModalNota'
 import Swal from 'sweetalert2'
+import toast from 'react-hot-toast'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import Head from 'next/head'
-import { faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faChartLine, faGraduationCap, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import {
   collection,
   deleteDoc,
@@ -45,6 +46,7 @@ export default function NotasPage() {
   const [cargando, setCargando] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -61,66 +63,52 @@ export default function NotasPage() {
 
   const cargarAsignaturasYNotas = async (uid: string) => {
     setCargando(true)
+    setError(null)
 
-    const asignaturasSnapshot = await getDocs(
-      query(
-        collection(db, 'asignaturas'),
-        where('user_id', '==', uid),
-        orderBy('curso', 'asc'),
-        orderBy('nombre', 'asc')
+    try {
+      const asignaturasSnapshot = await getDocs(
+        query(
+          collection(db, 'asignaturas'),
+          where('user_id', '==', uid),
+          orderBy('curso', 'asc'),
+          orderBy('nombre', 'asc')
+        )
       )
-    )
-    const asignaturasData = asignaturasSnapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as Omit<Asignatura, 'id'>),
-    }))
+      const asignaturasData = asignaturasSnapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<Asignatura, 'id'>),
+      }))
 
-    const notasSnapshot = await getDocs(
-      query(
-        collection(db, 'notas_academicas'),
-        where('user_id', '==', uid),
-        orderBy('created_at', 'asc')
+      const notasSnapshot = await getDocs(
+        query(
+          collection(db, 'notas_academicas'),
+          where('user_id', '==', uid),
+          orderBy('created_at', 'asc')
+        )
       )
-    )
-    const notasData = notasSnapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as Omit<Nota, 'id'>),
-    }))
+      const notasData = notasSnapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<Nota, 'id'>),
+      }))
 
-    setAsignaturas(asignaturasData)
+      setAsignaturas(asignaturasData)
 
-    const agrupadas = asignaturasData.reduce((acc, asignatura) => {
-      acc[asignatura.id] = notasData.filter(n => n.asignatura_id === asignatura.id)
-      return acc
-    }, {} as Record<string, Nota[]>)
+      const agrupadas = asignaturasData.reduce((acc, asignatura) => {
+        acc[asignatura.id] = notasData.filter(n => n.asignatura_id === asignatura.id)
+        return acc
+      }, {} as Record<string, Nota[]>)
 
-    setNotasPorAsignatura(agrupadas)
+      setNotasPorAsignatura(agrupadas)
 
-    if (seleccionada) {
-      setNotas(agrupadas[seleccionada] || [])
+      if (seleccionada) {
+        setNotas(agrupadas[seleccionada] || [])
+      }
+    } catch (err) {
+      const firebaseError = err as { message?: string }
+      setError(firebaseError.message || 'No se pudieron cargar las notas.')
+    } finally {
+      setCargando(false)
     }
-
-    setCargando(false)
-  }
-
-  const cargarNotas = async (uid: string, asignaturaId: string) => {
-    setCargando(true)
-    const snapshot = await getDocs(
-      query(
-        collection(db, 'notas_academicas'),
-        where('user_id', '==', uid),
-        where('asignatura_id', '==', asignaturaId),
-        orderBy('created_at', 'asc')
-      )
-    )
-
-    const data = snapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as Omit<Nota, 'id'>),
-    }))
-
-    setNotas(data)
-    setCargando(false)
   }
 
   const eliminarNota = async (id: string) => {
@@ -136,8 +124,12 @@ export default function NotasPage() {
     })
 
     if (confirmar.isConfirmed) {
-      await deleteDoc(doc(db, 'notas_academicas', id))
-      if (userId) await cargarAsignaturasYNotas(userId)
+      try {
+        await deleteDoc(doc(db, 'notas_academicas', id))
+        if (userId) await cargarAsignaturasYNotas(userId)
+      } catch (err) {
+        toast.error('No se pudo eliminar la nota')
+      }
     }
   }
 
@@ -180,122 +172,47 @@ export default function NotasPage() {
     }
   })
 
-  const asignaturasPorCurso = asignaturas.reduce((acc, a) => {
-    if (!acc[a.curso]) acc[a.curso] = []
-    acc[a.curso].push(a)
-    return acc
-  }, {} as Record<string, Asignatura[]>)
+  const asignaturaSeleccionada = seleccionada
+    ? asignaturas.find((asignatura) => asignatura.id === seleccionada)
+    : null
+
+  const abrirDetalleAsignatura = (asignaturaId: string) => {
+    setSeleccionada(asignaturaId)
+    setNotas(notasPorAsignatura[asignaturaId] || [])
+  }
+
+  const cerrarDetalleAsignatura = () => {
+    setSeleccionada(null)
+    setNotas([])
+    setModalVisible(false)
+  }
 
   return (
     <>
       <Head>
         <title>Notas</title>
       </Head>
-      <TopNav title="📊 Notas" showAdd={!!seleccionada} onAddClick={() => setModalVisible(true)} />
+      <AppShell title="Notas" eyebrow="Rendimiento" showAdd={false}>
+      <main className="academic-page">
+        <section className="metric-grid">
+          <article className="metric-card">
+            <FontAwesomeIcon icon={faChartLine} />
+            <div><strong>{mediaGlobal || '-'}</strong><span>Media global</span></div>
+          </article>
+          <article className="metric-card">
+            <FontAwesomeIcon icon={faGraduationCap} />
+            <div><strong>{notasFinales.length}</strong><span>Asignaturas evaluadas</span></div>
+          </article>
+        </section>
 
-      <div className="container mt-3 mb-5 pb-5">
-        <div className="mb-4">
-          <select className="form-select" onChange={(e) => {
-            setSeleccionada(e.target.value)
-            if (e.target.value && userId) cargarNotas(userId, e.target.value)
-          }} value={seleccionada || ''}>
-            <option value="">Selecciona una asignatura</option>
-            {Object.entries(asignaturasPorCurso).map(([curso, lista]) => (
-              <optgroup key={curso} label={`${curso}ª curso`}>
-                {lista.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.nombre}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-
+        {error && <div className="error-panel"><strong>No se pudieron cargar las notas</strong><p>{error}</p></div>}
         {cargando ? (
-          <div className="text-center mt-5">
-            <div className="spinner-border text-primary" role="status"></div>
-          </div>
-        ) : seleccionada ? (
-          <>
-            {notas.length === 0 ? (
-              <p className="text-white text-center">No hay notas aún.</p>
-            ) : (
-              <div
-                className="p-3 rounded shadow-sm d-flex flex-column gap-3"
-                style={{
-                  backgroundColor: '#1e1e1e',
-                  border: '1px solid #333',
-                }}
-              >
-                <div className="d-flex align-items-center gap-3 mb-2">
-                  <div
-                    style={{
-                      width: '60px',
-                      height: '60px',
-                      borderRadius: '50%',
-                      backgroundColor:
-                        asignaturas.find((a) => a.id === seleccionada)?.color || '#0d6efd',
-                      color: 'white',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      fontWeight: 'bold',
-                      fontSize: '1.2rem',
-                    }}
-                  >
-                    {calcularNotaFinal(notas).toFixed(2)}
-                  </div>
-                  <div className="text-white">
-                    <div className="fw-bold">
-                      {asignaturas.find((a) => a.id === seleccionada)?.nombre}
-                    </div>
-                    <div className="text-white-50">
-                      Total: {notas.reduce((acc, n) => acc + n.peso, 0)}%
-                    </div>
-                  </div>
-                </div>
-
-                <div className="d-flex flex-column gap-2">
-                  {notas.map((n) => (
-                    <div
-                      key={n.id}
-                      className="d-flex justify-content-between align-items-center px-2 py-2 rounded"
-                      style={{ backgroundColor: '#2a2a2a' }}
-                    >
-                      <div>
-                        <div className="fw-bold text-white">{n.tipo}</div>
-                        <div className="text-white-50 small">Peso: {n.peso}%</div>
-                      </div>
-                      <div className="d-flex align-items-center gap-3">
-                        <div className="fs-6 fw-bold text-white">{n.nota}</div>
-                        <button
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => eliminarNota(n.id)}
-                        >
-                          <FontAwesomeIcon icon={faTrash} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {userId && (
-              <ModalNota
-                visible={modalVisible}
-                asignaturaId={seleccionada}
-                onClose={() => setModalVisible(false)}
-                onSuccess={() => userId && cargarAsignaturasYNotas(userId)}
-                userId={userId}
-              />
-            )}
-          </>
+          <div className="app-state">Cargando notas...</div>
         ) : (
           <>
             {mediaGlobal ? (
-              <div className="text-center mb-4">
-                <div style={{ width: 220, height: 140, margin: '0 auto 1rem', position: 'relative' }}>
+              <section className="page-card grade-summary">
+                <div className="grade-gauge">
                   <svg width="220" height="140" viewBox="0 0 220 140" style={{ display: 'block', margin: '0 auto' }}>
                     {(() => {
                       const cx = 110
@@ -340,24 +257,12 @@ export default function NotasPage() {
                       })
                     })()}
                   </svg>
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: '79%',
-                      transform: 'translate(-50%, -50%)',
-                      color: 'white',
-                      fontSize: 30,
-                      fontWeight: 'bold',
-                      letterSpacing: '0.02em',
-                      textShadow: '0 6px 18px rgba(0,0,0,0.35)',
-                    }}
-                  >
+                  <div>
                     {mediaGlobal}
                   </div>
                 </div>
-                <p className="text-white">Media global de todas las asignaturas</p>
-                <div className="d-flex flex-wrap justify-content-center gap-3 text-white-50 small">
+                <h2>Media global de todas las asignaturas</h2>
+                <div className="course-legend">
                   {progresoPorCurso.map((item, idx) => (
                     <div key={item.curso}>
                       <span style={{ color: ['#ff4d4f', '#fadb14', '#52c41a', '#1677ff'][idx] }}>●</span>{' '}
@@ -365,31 +270,103 @@ export default function NotasPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
             ) : (
-              <p className="text-white text-center">No hay notas aún.</p>
+              <div className="empty-panel">No hay notas aún.</div>
             )}
 
-            {Object.entries(notasPorCurso)
+            <section className="stack-list">
+              {Object.entries(notasPorCurso)
               .sort((a, b) => Number(a[0]) - Number(b[0]))
               .map(([curso, lista]) => (
-                <div key={curso} className="mb-3">
-                  <h5 className="text-white fw-bold mb-2">{curso}ª curso</h5>
+                <article key={curso} className="page-card">
+                  <div className="card-heading">
+                    <div>
+                      <span className="soft-icon"><FontAwesomeIcon icon={faGraduationCap} /></span>
+                      <h2>{curso}º curso</h2>
+                    </div>
+                    <span>{lista.length} medias</span>
+                  </div>
+                  <div className="grade-course-list">
                   {lista.map(({ asignatura, final }) => (
-                    <div
+                    <button
                       key={asignatura.id}
-                      className="d-flex justify-content-between align-items-center mb-2 text-white p-3 rounded"
-                      style={{ backgroundColor: asignatura.color || '#343a40' }}
+                      className="grade-course-row"
+                      style={{ '--item-color': asignatura.color || '#6c8cff' } as React.CSSProperties}
+                      onClick={() => abrirDetalleAsignatura(asignatura.id)}
                     >
+                      <span className="color-dot" />
                       <strong>{asignatura.nombre}</strong>
-                      <span className="badge bg-light text-dark">{final.toFixed(2)}</span>
+                      <b>{final.toFixed(2)}</b>
+                    </button>
+                  ))}
+                  </div>
+                </article>
+              ))}
+            </section>
+          </>
+        )}
+
+        {asignaturaSeleccionada && !modalVisible && (
+          <div className="grade-modal-backdrop" onClick={cerrarDetalleAsignatura}>
+            <section
+              className="grade-modal"
+              style={{ '--item-color': asignaturaSeleccionada.color || '#6c8cff' } as React.CSSProperties}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="grade-modal__header">
+                <div className="grade-detail-head">
+                  <div className="grade-score">
+                    {notas.length ? calcularNotaFinal(notas).toFixed(2) : '-'}
+                  </div>
+                  <div>
+                    <h2>{asignaturaSeleccionada.nombre}</h2>
+                    <p>Total ponderado registrado: {notas.reduce((acc, n) => acc + n.peso, 0)}%</p>
+                  </div>
+                </div>
+                <button onClick={cerrarDetalleAsignatura} aria-label="Cerrar">×</button>
+              </div>
+
+              {notas.length === 0 ? (
+                <div className="empty-panel">No hay notas aún.</div>
+              ) : (
+                <div className="grade-list">
+                  {notas.map((n) => (
+                    <div key={n.id} className="grade-row">
+                      <div>
+                        <strong>{n.tipo}</strong>
+                        <span>Peso: {n.peso}%</span>
+                      </div>
+                      <div className="row-actions">
+                        <b>{n.nota}</b>
+                        <button onClick={() => eliminarNota(n.id)} aria-label="Eliminar nota">
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
-              ))}
-          </>
+              )}
+
+              <button className="grade-modal__add" onClick={() => setModalVisible(true)}>
+                <FontAwesomeIcon icon={faPlus} />
+                Añadir nota
+              </button>
+            </section>
+          </div>
         )}
-      </div>
+
+        {userId && seleccionada && (
+          <ModalNota
+            visible={modalVisible}
+            asignaturaId={seleccionada}
+            onClose={() => setModalVisible(false)}
+            onSuccess={() => userId && cargarAsignaturasYNotas(userId)}
+            userId={userId}
+          />
+        )}
+      </main>
+      </AppShell>
     </>
   )
 }

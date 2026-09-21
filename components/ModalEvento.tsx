@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react'
-import { EventInput } from '@fullcalendar/core'
 import { db } from '@/lib/firebaseClient'
 import toast from 'react-hot-toast'
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore'
+
+type EventoEditable = {
+  id?: string
+  title?: string
+  color?: string
+}
 
 type ModalEventoProps = {
   visible: boolean
@@ -10,7 +15,7 @@ type ModalEventoProps = {
   onSuccess: () => void
   userId: string
   fechaPorDefecto: string
-  evento: EventInput | null
+  evento: EventoEditable | null
 }
 
 export default function ModalEvento({

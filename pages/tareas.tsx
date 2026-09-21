@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { auth, db } from '@/lib/firebaseClient'
 import ModalTarea from '@/components/ModalTarea'
-import TopNav from '@/components/TopNav'
+import AppShell from '@/components/AppShell'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import Head from 'next/head'
-import { faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faCheckCircle, faClock, faPen, faTasks, faTrash } from '@fortawesome/free-solid-svg-icons'
 import {
   collection,
   deleteDoc,
@@ -44,6 +44,7 @@ export default function TareasPage() {
   const [modalVisible, setModalVisible] = useState(false)
   const [tareaEditando, setTareaEditando] = useState<Tarea | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -61,43 +62,54 @@ export default function TareasPage() {
 
   const cargarAsignaturasYtareas = async (uid: string) => {
     setCargando(true)
+    setError(null)
 
-    const asignaturasQuery = query(
-      collection(db, 'asignaturas'),
-      where('user_id', '==', uid),
-      orderBy('nombre')
-    )
-    const asignaturasSnapshot = await getDocs(asignaturasQuery)
-    const asignaturasData = asignaturasSnapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as Omit<Asignatura, 'id' | 'tareas'>),
-    }))
-
-    const tareasQuery = query(
-      collection(db, 'tareas'),
-      where('user_id', '==', uid),
-      orderBy('created_at', 'desc')
-    )
-    const tareasSnapshot = await getDocs(tareasQuery)
-    const tareasData = tareasSnapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as Omit<Tarea, 'id'>),
-    }))
-
-    const asignaturasConTareas: Asignatura[] = asignaturasData
-      .map((a) => ({
-        ...a,
-        tareas: tareasData?.filter((t) => t.asignatura_id === a.id) || [],
+    try {
+      const asignaturasQuery = query(
+        collection(db, 'asignaturas'),
+        where('user_id', '==', uid),
+        orderBy('nombre')
+      )
+      const asignaturasSnapshot = await getDocs(asignaturasQuery)
+      const asignaturasData = asignaturasSnapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<Asignatura, 'id' | 'tareas'>),
       }))
-      .filter((a) => a.tareas.length > 0)
 
-    setAsignaturas(asignaturasConTareas)
-    setCargando(false)
+      const tareasQuery = query(
+        collection(db, 'tareas'),
+        where('user_id', '==', uid),
+        orderBy('created_at', 'desc')
+      )
+      const tareasSnapshot = await getDocs(tareasQuery)
+      const tareasData = tareasSnapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<Tarea, 'id'>),
+      }))
+
+      const asignaturasConTareas: Asignatura[] = asignaturasData
+        .map((a) => ({
+          ...a,
+          tareas: tareasData?.filter((t) => t.asignatura_id === a.id) || [],
+        }))
+        .filter((a) => a.tareas.length > 0)
+
+      setAsignaturas(asignaturasConTareas)
+    } catch (err) {
+      const firebaseError = err as { message?: string }
+      setError(firebaseError.message || 'No se pudieron cargar las tareas.')
+    } finally {
+      setCargando(false)
+    }
   }
 
   const cambiarEstado = async (id: string, completada: boolean) => {
-    await updateDoc(doc(db, 'tareas', id), { completada })
-    if (userId) await cargarAsignaturasYtareas(userId)
+    try {
+      await updateDoc(doc(db, 'tareas', id), { completada })
+      if (userId) await cargarAsignaturasYtareas(userId)
+    } catch (err) {
+      toast.error('No se pudo actualizar la tarea')
+    }
   }
 
   const eliminarTarea = async (id: string) => {
@@ -113,70 +125,93 @@ export default function TareasPage() {
     })
 
     if (result.isConfirmed) {
-      await deleteDoc(doc(db, 'tareas', id))
-      toast.success('Tarea eliminada', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-      if (userId) await cargarAsignaturasYtareas(userId)
+      try {
+        await deleteDoc(doc(db, 'tareas', id))
+        toast.success('Tarea eliminada')
+        if (userId) await cargarAsignaturasYtareas(userId)
+      } catch (err) {
+        toast.error('No se pudo eliminar la tarea')
+      }
     }
   }
 
   if (!usuarioVerificado) {
-    return <p className="p-4">Verificando sesión...</p>
+    return <p className="app-state">Verificando sesión...</p>
   }
+
+  const todasLasTareas = asignaturas.flatMap((asignatura) => asignatura.tareas)
+  const pendientes = todasLasTareas.filter((tarea) => !tarea.completada).length
+  const completadas = todasLasTareas.filter((tarea) => tarea.completada).length
 
   return (
     <>
       <Head>
         <title>Tareas</title>
       </Head>
-      <TopNav title="👋 Tareas" onAddClick={() => {
+      <AppShell title="Tareas" eyebrow="Productividad" onAddClick={() => {
         setTareaEditando(null)
         setModalVisible(true)
-      }} />
-      <div className="container mt-3 mb-5 pb-5">
-        {cargando ? (
-          <div className="text-center">
-            <div className="spinner-border text-primary" role="status" />
-          </div>
-        ) : asignaturas.length === 0 ? (
-          <p className="text-white text-center">No tienes tareas aún.</p>
-        ) : (
-          asignaturas.map((asignatura) => (
-            <div key={asignatura.id} className="mb-4 p-4 rounded text-white" style={{backgroundColor: asignatura.color || '#343a40', boxShadow: '0 2px 6px rgba(0,0,0,0.3)',}}>
-              <h5 className="mb-3">{asignatura.nombre}</h5>
+      }}>
+      <main className="academic-page">
+        <section className="metric-grid">
+          <article className="metric-card">
+            <FontAwesomeIcon icon={faClock} />
+            <div><strong>{pendientes}</strong><span>Pendientes</span></div>
+          </article>
+          <article className="metric-card">
+            <FontAwesomeIcon icon={faCheckCircle} />
+            <div><strong>{completadas}</strong><span>Completadas</span></div>
+          </article>
+          <article className="metric-card">
+            <FontAwesomeIcon icon={faTasks} />
+            <div><strong>{asignaturas.length}</strong><span>Asignaturas con tareas</span></div>
+          </article>
+        </section>
 
-              {asignatura.tareas.map((tarea) => (
-                <div key={tarea.id} className="d-flex justify-content-between align-items-start mb-2">
-                  <div className="form-check">
-                    <input className="form-check-input me-2" type="checkbox" checked={tarea.completada} onChange={(e) => cambiarEstado(tarea.id, e.target.checked)} />
-                    <label className={`form-check-label ${tarea.completada ? 'text-decoration-line-through text-muted' : ''}`}>
-                      {tarea.titulo}
-                    </label>
-                    {tarea.fecha_entrega && (
-                      <div className="small mt-1 text-light">
-                        📅 {new Date(tarea.fecha_entrega).toLocaleDateString()}
-                      </div>
-                    )}
+        {error && <div className="error-panel"><strong>No se pudieron cargar las tareas</strong><p>{error}</p></div>}
+        {cargando ? (
+          <div className="app-state">Cargando tareas...</div>
+        ) : asignaturas.length === 0 ? (
+          <div className="empty-panel">No tienes tareas aún.</div>
+        ) : (
+          <section className="stack-list">
+            {asignaturas.map((asignatura) => (
+              <article key={asignatura.id} className="page-card" style={{ '--item-color': asignatura.color || '#6c8cff' } as React.CSSProperties}>
+                <div className="card-heading">
+                  <div>
+                    <span className="color-dot" />
+                    <h2>{asignatura.nombre}</h2>
                   </div>
-                  <div className="button-group">
-                    <button className="btn btn-sm btn-outline-light" onClick={() => {
-                      setTareaEditando(tarea)
-                      setModalVisible(true)
-                    }}>
-                      <FontAwesomeIcon icon={faPen} />
-                    </button>
-                    <button className="btn btn-sm btn-outline-light ms-1" onClick={() => eliminarTarea(tarea.id)}>
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
-                  </div>
+                  <span>{asignatura.tareas.filter((tarea) => !tarea.completada).length} pendientes</span>
                 </div>
-              ))}
-            </div>
-          ))
+
+                <div className="task-page-list">
+                  {asignatura.tareas.map((tarea) => (
+                    <div key={tarea.id} className={`task-page-row ${tarea.completada ? 'is-done' : ''}`}>
+                      <label>
+                        <input type="checkbox" checked={tarea.completada} onChange={(e) => cambiarEstado(tarea.id, e.target.checked)} />
+                        <span>{tarea.titulo}</span>
+                      </label>
+                      {tarea.fecha_entrega && (
+                        <time>{new Date(`${tarea.fecha_entrega}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</time>
+                      )}
+                      <div className="row-actions">
+                        <button onClick={() => {
+                          setTareaEditando(tarea)
+                          setModalVisible(true)
+                        }} aria-label="Editar tarea">
+                          <FontAwesomeIcon icon={faPen} />
+                        </button>
+                        <button onClick={() => eliminarTarea(tarea.id)} aria-label="Eliminar tarea">
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </section>
         )}
 
         {userId && (
@@ -195,7 +230,8 @@ export default function TareasPage() {
             userId={userId}
           />
         )}
-      </div>
+      </main>
+      </AppShell>
     </>
   )
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { auth } from '@/lib/firebaseClient'
 import { useRouter } from 'next/router'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
+import SplashScreen from '@/components/SplashScreen'
 
 export default function LogoutPage() {
   const router = useRouter()
@@ -23,13 +24,5 @@ export default function LogoutPage() {
     return () => unsubscribe()
   }, [router])
 
-  return (
-    <div className="d-flex justify-content-center align-items-center vh-100">
-      {cargando ? (
-        <div className="spinner-border text-primary" role="status" />
-      ) : (
-        <p className="text-white">Redirigiendo...</p>
-      )}
-    </div>
-  )
+  return cargando ? <SplashScreen /> : <p className="app-state">Redirigiendo...</p>
 }

@@ -21,68 +21,26 @@ export default function BottomNav() {
 
   if (!show) return null
 
-  const navStyle: React.CSSProperties = {
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingTop: '8px',
-    paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3px)',
-    backgroundColor: '#1a1a1a',
-    color: '#ffffff',
-    borderTop: '1px solid #333',
-    zIndex: 1000,
-  }
-
-  const linkStyle: React.CSSProperties = {
-    textDecoration: 'none',
-    color: '#aaa',
-    fontSize: '0.8rem',
-  }
-
-  const activeStyle: React.CSSProperties = {
-    color: '#0d6efd', // azul Bootstrap
-  }
+  const items = [
+    { href: '/', label: 'Inicio', icon: faHome },
+    { href: '/horarios', label: 'Horario', icon: faClock },
+    { href: '/asignaturas', label: 'Asignaturas', icon: faBook },
+    { href: '/tareas', label: 'Tareas', icon: faTasks },
+    { href: '/notas', label: 'Notas', icon: faChartColumn },
+  ]
 
   return (
-    <nav
-      className="navbar d-flex justify-content-around"
-      style={navStyle}
-    >
-      <Link href="/" style={router.pathname === '/' ? { ...linkStyle, ...activeStyle } : linkStyle}>
-        <div className="text-center">
-          <FontAwesomeIcon icon={faHome} size="lg" />
-          <div>Inicio</div>
-        </div>
-      </Link>
-
-      <Link href="/horarios" style={router.pathname === '/horarios' ? { ...linkStyle, ...activeStyle } : linkStyle}>
-        <div className="text-center">
-          <FontAwesomeIcon icon={faClock} size="lg" />
-          <div>Horarios</div>
-        </div> 
-      </Link>
-
-      <Link href="/tareas" style={router.pathname === '/tareas' ? { ...linkStyle, ...activeStyle } : linkStyle}>
-        <div className="text-center">
-          <FontAwesomeIcon icon={faTasks} size="lg" />
-          <div>Tareas</div>
-        </div>
-      </Link>
-
-      <Link href="/notas" style={router.pathname === '/notas' ? { ...linkStyle, ...activeStyle } : linkStyle}>
-        <div className="text-center">
-          <FontAwesomeIcon icon={faChartColumn} size="lg" />
-          <div>Notas</div>
-        </div>
-      </Link>
-
-      <Link href="/asignaturas" style={router.pathname === '/asignaturas' ? { ...linkStyle, ...activeStyle } : linkStyle}>
-        <div className="text-center">
-          <FontAwesomeIcon icon={faBook} size="lg" />
-          <div>Asignaturas</div>
-        </div>
-      </Link>
+    <nav className="bottom-nav" aria-label="Navegación principal">
+      {items.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={`bottom-nav__item ${router.pathname === item.href ? 'is-active' : ''}`}
+        >
+          <FontAwesomeIcon icon={item.icon} />
+          <span>{item.label}</span>
+        </Link>
+      ))}
     </nav>
   )
 }

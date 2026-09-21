@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { auth, db } from '@/lib/firebaseClient'
 import ModalAsignatura from '@/components/ModalAsignatura'
-import TopNav from '@/components/TopNav'
+import AppShell from '@/components/AppShell'
 import Swal from 'sweetalert2'
+import toast from 'react-hot-toast'
 import Head from 'next/head'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faBookOpen, faLayerGroup, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { collection, deleteDoc, doc, getDocs, orderBy, query, where } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 
@@ -23,6 +24,7 @@ export default function AsignaturasPage() {
   const [cargando, setCargando] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -40,19 +42,26 @@ export default function AsignaturasPage() {
 
   const cargarAsignaturas = async (uid: string) => {
     setCargando(true)
-    const q = query(
-      collection(db, 'asignaturas'),
-      where('user_id', '==', uid),
-      orderBy('curso', 'asc'),
-      orderBy('nombre', 'asc')
-    )
-    const snapshot = await getDocs(q)
-    const data = snapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as Omit<Asignatura, 'id'>),
-    }))
-    setAsignaturas(data)
-    setCargando(false)
+    setError(null)
+    try {
+      const q = query(
+        collection(db, 'asignaturas'),
+        where('user_id', '==', uid),
+        orderBy('curso', 'asc'),
+        orderBy('nombre', 'asc')
+      )
+      const snapshot = await getDocs(q)
+      const data = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<Asignatura, 'id'>),
+      }))
+      setAsignaturas(data)
+    } catch (err) {
+      const firebaseError = err as { message?: string }
+      setError(firebaseError.message || 'No se pudieron cargar las asignaturas.')
+    } finally {
+      setCargando(false)
+    }
   }
 
   const eliminarAsignatura = async (id: string) => {
@@ -68,8 +77,12 @@ export default function AsignaturasPage() {
     })
 
     if (confirmar.isConfirmed) {
-      await deleteDoc(doc(db, 'asignaturas', id))
-      if (userId) await cargarAsignaturas(userId)
+      try {
+        await deleteDoc(doc(db, 'asignaturas', id))
+        if (userId) await cargarAsignaturas(userId)
+      } catch (err) {
+        toast.error('No se pudo eliminar la asignatura')
+      }
     }
   }
 
@@ -85,43 +98,59 @@ export default function AsignaturasPage() {
         <title>Asignaturas</title>
       </Head>
 
-      <TopNav title="📚 Asignaturas" onAddClick={() => setModalVisible(true)} />
+      <AppShell title="Asignaturas" eyebrow="Plan académico" onAddClick={() => setModalVisible(true)}>
+      <main className="academic-page subjects-page">
+        <section className="metric-grid">
+          <article className="metric-card">
+            <FontAwesomeIcon icon={faBookOpen} />
+            <div><strong>{asignaturas.length}</strong><span>Asignaturas</span></div>
+          </article>
+          <article className="metric-card">
+            <FontAwesomeIcon icon={faLayerGroup} />
+            <div><strong>{Object.keys(asignaturasPorCurso).length}</strong><span>Cursos activos</span></div>
+          </article>
+        </section>
 
-      <div className="container mt-4 mb-5 pb-5">
+        {error && <div className="error-panel"><strong>No se pudieron cargar las asignaturas</strong><p>{error}</p></div>}
         {cargando ? (
-          <div className="text-center mt-4">
-            <div className="spinner-border text-primary" role="status" />
-          </div>
+          <div className="app-state">Cargando asignaturas...</div>
         ) : Object.keys(asignaturasPorCurso).length === 0 ? (
-          <p className="text-white text-center mt-4">No tienes asignaturas.</p>
+          <div className="empty-panel">No tienes asignaturas.</div>
         ) : (
-          Object.entries(asignaturasPorCurso).map(([curso, lista]) => (
-            <div key={curso} className="mb-4">
-              <h5 className="text-white fw-bold mb-3">{curso}ª curso</h5>
-              <ul className="list-group">
+          <section className="stack-list subjects-stack">
+            {Object.entries(asignaturasPorCurso).map(([curso, lista]) => (
+              <article key={curso} className="page-card">
+                <div className="card-heading">
+                  <div>
+                    <span className="soft-icon"><FontAwesomeIcon icon={faLayerGroup} /></span>
+                    <h2>{curso}º curso</h2>
+                  </div>
+                  <span>{lista.length} asignatura{lista.length === 1 ? '' : 's'}</span>
+                </div>
+                <div className="subject-list-compact">
                 {lista.map((a) => (
-                  <li
+                  <div
                     key={a.id}
-                    className="list-group-item d-flex justify-content-between align-items-center text-white mb-2"
-                    style={{
-                      backgroundColor: a.color || '#343a40',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '0.75rem 1rem',
-                    }}
+                    className="subject-list-row"
+                    style={{ '--item-color': a.color || '#6c8cff' } as React.CSSProperties}
                   >
-                    <span className="fw-semibold">{a.nombre}</span>
+                    <span className="color-dot" />
+                    <div>
+                      <strong>{a.nombre}</strong>
+                      <small>{a.curso}º curso</small>
+                    </div>
                     <button
-                      className="btn btn-sm btn-outline-light"
                       onClick={() => eliminarAsignatura(a.id)}
+                      aria-label="Eliminar asignatura"
                     >
                       <FontAwesomeIcon icon={faTrash} />
                     </button>
-                  </li>
+                  </div>
                 ))}
-              </ul>
-            </div>
-          ))
+                </div>
+              </article>
+            ))}
+          </section>
         )}
 
         {userId && (
@@ -132,7 +161,8 @@ export default function AsignaturasPage() {
             userId={userId}
           />
         )}
-      </div>
+      </main>
+      </AppShell>
     </>
   )
 }

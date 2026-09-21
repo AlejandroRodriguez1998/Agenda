@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { auth } from '@/lib/firebaseClient'
-import TopNav from '@/components/TopNav'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import Head from 'next/head'
 import CalendarioUsuario from '@/components/CalendarioUsuario'
+import SplashScreen from '@/components/SplashScreen'
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth'
 import styles from '@/styles/Inicio.module.css'
 
@@ -33,134 +33,122 @@ export default function InicioPage() {
   return (
     <>
       <Head>
-        <title>Agenda Escolar</title>
+        <title>Agenda Académica</title>
       </Head>
 
       {cargando ? (
-        <div className="d-flex justify-content-center align-items-center vh-100">
-          <div className="spinner-border text-primary" role="status" />
-        </div>
+        <SplashScreen />
       ) : user ? (
-        <>
-          <TopNav
-            title="🏠 Inicio"
-            customRightIcon="logout"
-            onRightClick={async () => {
+        <CalendarioUsuario
+          userId={user.uid}
+          userName={user.displayName}
+          userEmail={user.email}
+          onLogout={async () => {
               await signOut(auth)
               localStorage.setItem('showLogoutToast', 'true')
               router.push('/').then(() => router.reload())
             }}
-          />
-          <CalendarioUsuario userId={user.uid} />
-        </>
+        />
       ) : (
         <div className={styles.landing}>
-          <div className={styles.hero}>
+          <header className={styles.publicNav}>
+            <div className={styles.brandMark}>A</div>
+            <span>Agenda Académica</span>
+            <Link href="/login">Entrar</Link>
+          </header>
+
+          <section className={styles.hero}>
             <div className={styles.heroContent}>
-              <span className={styles.badge}>Agenda escolar inteligente</span>
-              <h1 className={styles.title}>Organiza tu semana en minutos</h1>
+              <span className={styles.badge}>Dashboard universitario</span>
+              <h1 className={styles.title}>Agenda Académica</h1>
               <p className={styles.subtitle}>
-                Planifica tareas, horarios, eventos y notas desde un solo lugar. Todo lo
-                que necesitas para llevar el control de tu vida academica.
+                Un panel claro para organizar horarios, tareas, entregas y notas sin perderte
+                entre pantallas repetidas.
               </p>
               <div className={styles.ctaRow}>
-                <Link href="/login" className="btn btn-light btn-lg px-4">Iniciar sesión</Link>
-                <span className={styles.ctaHint}>Sin anuncios • Gratis</span>
-              </div>
-              <div className={styles.stats}>
-                <div>
-                  <div className={styles.statValue}>4</div>
-                  <div className={styles.statLabel}>vistas clave</div>
-                </div>
-                <div>
-                  <div className={styles.statValue}>100%</div>
-                  <div className={styles.statLabel}>en la nube</div>
-                </div>
-                <div>
-                  <div className={styles.statValue}>1</div>
-                  <div className={styles.statLabel}>panel unificado</div>
-                </div>
+                <Link href="/login" className={styles.primaryCta}>Empezar ahora</Link>
+                <span className={styles.ctaHint}>Gratis para uso personal</span>
               </div>
             </div>
-            <div className={styles.heroCard}>
-              <div className={styles.heroCardHeader}>
-                <span>Hoy</span>
-                <span className={styles.heroChip}>En curso</span>
+
+            <div className={styles.productPreview} aria-label="Vista previa del dashboard">
+              <div className={styles.previewHeader}>
+                <div>
+                  <span>Hoy</span>
+                  <strong>21 septiembre</strong>
+                </div>
+                <b>Semana</b>
               </div>
-              <div className={styles.heroCardBody}>
-                <div className={styles.heroRow}>
-                  <div className={styles.heroDot}></div>
+              <div className={styles.previewSchedule}>
+                <div className={styles.previewEvent}>
+                  <span>09:00</span>
                   <div>
-                    <div className={styles.heroRowTitle}>Matematicas</div>
-                    <div className={styles.heroRowMeta}>08:30 · Clase teorica</div>
+                    <strong>Sistemas Distribuidos</strong>
+                    <p>Aula 1.2</p>
                   </div>
                 </div>
-                <div className={styles.heroRow}>
-                  <div className={`${styles.heroDot} ${styles.heroDotAlt}`}></div>
+                <div className={styles.previewEvent}>
+                  <span>12:00</span>
                   <div>
-                    <div className={styles.heroRowTitle}>Tarea de historia</div>
-                    <div className={styles.heroRowMeta}>Entrega mañana</div>
+                    <strong>Práctica de Redes</strong>
+                    <p>Entrega pendiente</p>
                   </div>
                 </div>
-                <div className={styles.heroChecklist}>
-                  <div>✅ Repasar examen</div>
-                  <div>✅ Subir apuntes</div>
-                  <div>⬜ Preparar laboratorio</div>
+              </div>
+              <div className={styles.previewStats}>
+                <div>
+                  <span>4</span>
+                  <p>Tareas abiertas</p>
+                </div>
+                <div>
+                  <span>6.62</span>
+                  <p>Media global</p>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className={styles.featureGrid}>
-            <div className={styles.featureCard}>
-              <h4>📝 Gestiona tus tareas</h4>
-              <p>Añade, marca como completadas y organiza tus tareas por asignatura.</p>
-            </div>
-            <div className={styles.featureCard}>
-              <h4>📚 Organiza tus asignaturas</h4>
-              <p>Crea asignaturas y asigna colores para identificarlas rapidamente.</p>
-            </div>
-            <div className={styles.featureCard}>
-              <h4>📊 Controla tus notas</h4>
-              <p>Introduce calificaciones, pesos y visualiza tu media global.</p>
-            </div>
-            <div className={styles.featureCard}>
-              <h4>🗓️ Agenda visual</h4>
-              <p>Eventos, clases y tareas en un calendario claro y rapido.</p>
-            </div>
-          </div>
-
-          <div className={styles.steps}>
-            <div className={styles.step}>
-              <div className={styles.stepNumber}>01</div>
-              <div>
-                <h5>Inicia sesion</h5>
-                <p>Accede a tu cuenta y sincroniza todo en la nube.</p>
-              </div>
-            </div>
-            <div className={styles.step}>
-              <div className={styles.stepNumber}>02</div>
-              <div>
-                <h5>Configura tus asignaturas</h5>
-                <p>Colores, cursos y horarios personalizados al instante.</p>
-              </div>
-            </div>
-            <div className={styles.step}>
-              <div className={styles.stepNumber}>03</div>
-              <div>
-                <h5>Planifica tu semana</h5>
-                <p>Añade tareas, eventos y notas desde cualquier dispositivo.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.finalCta}>
+          <section className={styles.featureBand} aria-label="Funciones principales">
             <div>
-              <h3>Todo tu ritmo academico en un mismo lugar</h3>
-              <p>Empieza ahora y manten el control sin esfuerzo.</p>
+              <span>Calendario</span>
+              <strong>Semana, día y mes</strong>
             </div>
-            <Link href="/login" className="btn btn-outline-light btn-lg px-4">Entrar</Link>
-          </div>
+            <div>
+              <span>Tareas</span>
+              <strong>Pendientes y entregas</strong>
+            </div>
+            <div>
+              <span>Notas</span>
+              <strong>Medias ponderadas</strong>
+            </div>
+          </section>
+
+          <section className={styles.workflow} aria-label="Resumen de uso">
+            <article className={styles.workflowCard}>
+              <span className={styles.workflowLabel}>Organiza</span>
+              <h2>Todo empieza en tu semana</h2>
+              <p>
+                Reúne clases recurrentes, tutorías, prácticas y entregas en un calendario que
+                se puede revisar de un vistazo.
+              </p>
+            </article>
+            <article className={styles.workflowCard}>
+              <span className={styles.workflowLabel}>Prioriza</span>
+              <h2>Las tareas no se pierden</h2>
+              <p>
+                Marca pendientes, separa lo urgente de lo hecho y conserva el contexto de cada
+                asignatura sin abrir otra herramienta.
+              </p>
+            </article>
+            <article className={styles.workflowCard}>
+              <span className={styles.workflowLabel}>Mide</span>
+              <h2>Notas claras por asignatura</h2>
+              <p>
+                Guarda calificaciones con peso, consulta medias y detecta rápido dónde conviene
+                apretar un poco más.
+              </p>
+            </article>
+          </section>
         </div>
       )}
     </>

@@ -9,7 +9,6 @@ Construida con **Next.js**, desplegada en **Vercel**, y con **Firebase** como ba
 - [Firebase](https://firebase.google.com/) — Backend as a Service (Auth, DB)
 - [Vercel](https://vercel.com/) — Deploy hosting
 - [Bootstrap 5](https://getbootstrap.com/) — Estilos
-- [FullCalendar](https://fullcalendar.io/) — Calendario interactivo
 
 ## 📦 Instalación local
 
