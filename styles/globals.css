@@ -1797,6 +1797,220 @@ button.grade-course-row:hover {
   }
 }
 
+/* Mobile density: shared spacing, with tablet/desktop rules left intact. */
+@media (max-width: 767px) {
+  :root {
+    --mobile-space-xs: 4px;
+    --mobile-space-sm: 8px;
+    --mobile-space-md: 12px;
+    --mobile-page-inset: 16px;
+    --mobile-touch: 44px;
+    --mobile-nav-height: 56px;
+    --mobile-nav-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-shell,
+  .academic-shell {
+    padding-bottom: calc(var(--mobile-nav-height) + var(--mobile-nav-bottom) + var(--mobile-space-md));
+  }
+
+  .app-shell__body,
+  .academic-main {
+    padding: max(var(--mobile-space-md), env(safe-area-inset-top, 0px)) max(var(--mobile-page-inset), env(safe-area-inset-right, 0px)) 0 max(var(--mobile-page-inset), env(safe-area-inset-left, 0px));
+  }
+
+  .app-shell .academic-page {
+    margin-bottom: 0;
+    padding: 0;
+  }
+
+  .app-shell__header,
+  .academic-header {
+    min-height: 0;
+    gap: var(--mobile-space-sm);
+    margin-bottom: var(--mobile-space-md);
+  }
+
+  .app-shell__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .app-shell__header > div:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .app-shell__header h1 { margin-top: 0; font-size: 1.35rem; }
+
+  .app-shell__search,
+  .academic-search {
+    min-width: 0;
+    height: var(--mobile-touch);
+    padding-inline: var(--mobile-space-md);
+    gap: var(--mobile-space-sm);
+  }
+
+  .app-shell__search input,
+  .academic-search input { min-width: 0; }
+
+  .app-shell__actions,
+  .academic-actions { gap: var(--mobile-space-xs); }
+
+  .app-shell__actions button,
+  .academic-actions > button,
+  .app-shell__actions .theme-toggle button,
+  .academic-actions .theme-toggle button {
+    width: var(--mobile-touch);
+    height: var(--mobile-touch);
+    flex-shrink: 0;
+  }
+
+  .app-shell__actions .theme-toggle,
+  .academic-actions .theme-toggle {
+    height: auto;
+    padding: 0;
+    gap: 0;
+  }
+
+  .metric-grid,
+  .subjects-page .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mobile-space-sm);
+    margin: 0 0 var(--mobile-space-md);
+  }
+
+  .metric-card,
+  .subjects-page .metric-card {
+    min-width: 0;
+    min-height: 60px;
+    padding: var(--mobile-space-sm);
+    gap: var(--mobile-space-sm);
+  }
+
+  .metric-card > svg {
+    width: 30px;
+    height: 30px;
+    padding: 7px;
+    flex-shrink: 0;
+  }
+
+  .metric-card > div { min-width: 0; }
+  .metric-card span { display: block; line-height: 1.25; overflow-wrap: anywhere; }
+
+  /* An odd final statistic uses the full row without an oversized empty card. */
+  .metric-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .metric-card:last-child:nth-child(odd) > div {
+    display: flex;
+    align-items: center;
+    gap: var(--mobile-space-sm);
+  }
+
+  .stack-list,
+  .subjects-stack,
+  .academic-dashboard,
+  .academic-content,
+  .academic-right { gap: var(--mobile-space-md); }
+
+  .page-card,
+  .subjects-page .page-card,
+  .subjects-strip,
+  .side-card,
+  .page-toolbar { padding: var(--mobile-space-md); }
+
+  .card-heading,
+  .subjects-page .card-heading {
+    margin-bottom: var(--mobile-space-sm);
+    gap: var(--mobile-space-sm);
+    flex-wrap: wrap;
+  }
+
+  .card-heading > div { gap: var(--mobile-space-sm); }
+  .soft-icon { width: 28px; height: 28px; }
+
+  .subject-list-compact { columns: 1; }
+  .subject-list-row,
+  .grade-course-row {
+    min-height: 52px;
+    padding: var(--mobile-space-xs) var(--mobile-space-sm);
+    gap: var(--mobile-space-sm);
+    grid-template-columns: 12px minmax(0, 1fr) auto;
+  }
+
+  .subject-list-row { margin-bottom: var(--mobile-space-xs); }
+  .subject-list-row:last-child { margin-bottom: 0; }
+  .subject-list-row small { margin-top: 0; }
+  .subject-list-row strong,
+  .grade-course-row strong,
+  .schedule-row strong,
+  .grade-row strong,
+  .card-heading h2,
+  .subject-card h3,
+  .upcoming-row strong { overflow-wrap: anywhere; }
+
+  /* Keep the delete target generous while reducing the visible icon. */
+  .subject-list-row button,
+  .row-actions button {
+    width: var(--mobile-touch);
+    height: var(--mobile-touch);
+    flex-shrink: 0;
+  }
+  .subject-list-row button svg { width: 12px; height: 12px; }
+
+  .task-page-list,
+  .grade-list,
+  .grade-course-list { gap: var(--mobile-space-xs); }
+
+  .task-page-row,
+  .schedule-row,
+  .grade-row {
+    min-height: 0;
+    padding: var(--mobile-space-sm);
+    gap: var(--mobile-space-sm);
+  }
+  .schedule-row { margin-top: var(--mobile-space-sm); }
+  .schedule-row:first-child { margin-top: 0; }
+  .schedule-row > div:first-child { grid-template-columns: 12px minmax(0, 1fr); }
+  .grade-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .task-page-row label { min-height: var(--mobile-touch); }
+  .task-page-row label span { white-space: normal; overflow-wrap: anywhere; }
+  .task-page-row input { flex-shrink: 0; }
+  .row-actions { gap: var(--mobile-space-xs); }
+
+  .filter-chips { margin-bottom: var(--mobile-space-md); gap: var(--mobile-space-xs); }
+  .filter-chips button { min-height: var(--mobile-touch); padding: 6px var(--mobile-space-md); }
+  .empty-inline { margin: 0; padding-block: var(--mobile-space-xs); }
+  .empty-panel { padding: var(--mobile-page-inset); }
+
+  .grade-summary { margin-bottom: var(--mobile-space-md); }
+  .grade-gauge { margin-bottom: var(--mobile-space-xs); }
+  .course-legend { margin-top: var(--mobile-space-sm); gap: var(--mobile-space-sm); }
+
+  .academic-hero { min-height: 0; gap: var(--mobile-space-sm); }
+  .academic-hero h1 { margin-bottom: var(--mobile-space-xs); }
+  .academic-hero button { height: var(--mobile-touch); }
+  .week-card__toolbar { min-height: 0; padding: var(--mobile-space-sm); gap: var(--mobile-space-sm); }
+  .week-card__nav { flex-wrap: wrap; gap: var(--mobile-space-xs); }
+  .week-card__nav button,
+  .week-card__today { min-width: var(--mobile-touch); height: var(--mobile-touch); }
+  .week-card__modes { padding: 2px; gap: 2px; }
+  .week-card__modes button { min-height: var(--mobile-touch); padding: 6px var(--mobile-space-md); }
+
+  .bottom-nav {
+    min-height: var(--mobile-nav-height);
+    bottom: var(--mobile-nav-bottom);
+    padding: var(--mobile-space-xs);
+    gap: 2px;
+  }
+  .bottom-nav__item { min-height: 46px; grid-template-rows: 20px auto; gap: 0; }
+  .bottom-nav__item svg { width: 18px; height: 18px; }
+}
+
+@media (max-width: 374px) {
+  /* Let the title breathe at narrow widths instead of squeezing its controls. */
+  .app-shell__header { grid-template-columns: minmax(0, 1fr); }
+  .app-shell__actions { justify-content: flex-start; }
+}
+
 .swal2-popup {
   background-color: #1e1e1e !important;
   color: var(--page-surface) !important;
