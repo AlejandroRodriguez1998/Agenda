@@ -1,75 +1,64 @@
 import { useState } from 'react'
-import { useRouter } from 'next/router'
+import Link from 'next/link'
 import { auth } from '@/lib/firebaseClient'
 import styles from './AuthForm.module.css'
 import toast from 'react-hot-toast'
 import Head from 'next/head'
-import Swal from 'sweetalert2'
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
 } from 'firebase/auth'
+
+const ERRORES: Record<string, string> = {
+  'auth/invalid-credential': 'Correo o contraseña incorrectos',
+  'auth/wrong-password': 'Correo o contraseña incorrectos',
+  'auth/user-not-found': 'Correo o contraseña incorrectos',
+  'auth/email-already-in-use': 'Ya existe una cuenta con ese correo',
+  'auth/invalid-email': 'El correo no es válido',
+  'auth/missing-email': 'Escribe tu correo',
+  'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
+  'auth/too-many-requests': 'Demasiados intentos. Inténtalo más tarde',
+  'auth/network-request-failed': 'Sin conexión a internet',
+}
+
+const traducirError = (err: unknown) => ERRORES[(err as { code?: string })?.code ?? ''] || 'Algo ha fallado. Inténtalo de nuevo'
 
 export default function AuthForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLogin, setIsLogin] = useState(true)
-  const router = useRouter()
+  const [enviando, setEnviando] = useState(false)
 
+  // Tras iniciar sesión, pages/login.tsx redirige al detectar el usuario.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
+    setEnviando(true)
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password)
-        toast.success('¡Bienvenido! 👋', {
-          style: {
-            background: '#1a1a1a',
-            color: '#fff',
-          },
-        })
-        router.push('/')
+        await signInWithEmailAndPassword(auth, email.trim(), password)
+        toast.success('¡Bienvenido! 👋')
       } else {
-        const cred = await createUserWithEmailAndPassword(auth, email, password)
-        await sendEmailVerification(cred.user, {
-          url: `${window.location.origin}/verificar`,
-        })
-
-        await Swal.fire({
-          icon: 'success',
-          title: '¡Registro completado!',
-          text: 'Hemos enviado un correo a tu dirección para que verifiques tu cuenta.',
-          confirmButtonText: 'Entendido',
-          background: '#1a1a1a',
-          color: '#fff',
-        })
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
+        await sendEmailVerification(cred.user, { url: `${window.location.origin}/verificar` })
+        toast.success('Cuenta creada. Revisa tu correo para verificarla', { duration: 6000 })
       }
     } catch (err) {
-      const firebaseError = err as { code?: string; message?: string }
-      const traduccion = traducirError(firebaseError.code || firebaseError.message || '')
-      toast.error(traduccion, {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-      return
+      toast.error(traducirError(err))
+    } finally {
+      setEnviando(false)
     }
   }
 
-  function traducirError(mensaje: string): string {
-    const errores: Record<string, string> = {
-      'auth/invalid-credential': 'Credenciales incorrectas',
-      'auth/wrong-password': 'Credenciales incorrectas',
-      'auth/user-not-found': 'Usuario no encontrado',
-      'auth/email-already-in-use': 'El usuario ya está registrado',
-      'auth/invalid-email': 'El correo no es válido',
-      'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
-      'auth/too-many-requests': 'Demasiados intentos. Inténtalo más tarde',
+  const recuperar = async () => {
+    if (!email.trim()) return void toast.error('Escribe tu correo arriba y vuelve a pulsar')
+    try {
+      await sendPasswordResetEmail(auth, email.trim())
+      toast.success('Si el correo existe, recibirás un enlace para restablecerla', { duration: 6000 })
+    } catch (err) {
+      toast.error(traducirError(err))
     }
-
-    return errores[mensaje] || 'Error desconocido'
   }
 
   return (
@@ -80,13 +69,13 @@ export default function AuthForm() {
 
       <div className={styles.wrapper}>
         <header className={styles.publicNav}>
-          <button type="button" className={styles.brandButton} onClick={() => router.push('/')}>
+          <Link href="/" className={styles.brandButton}>
             <span className={styles.brandMark}>A</span>
             <b>Agenda Académica</b>
-          </button>
-          <button type="button" className={styles.backButton} onClick={() => router.push('/')}>
+          </Link>
+          <Link href="/" className={styles.backButton}>
             Volver
-          </button>
+          </Link>
         </header>
 
         <section className={styles.panel}>
@@ -125,6 +114,8 @@ export default function AuthForm() {
             type="email"
             name="email"
             placeholder="Correo electrónico"
+            autoComplete="email"
+            inputMode="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -135,14 +126,22 @@ export default function AuthForm() {
             type="password"
             name="password"
             placeholder="Contraseña"
+            autoComplete={isLogin ? 'current-password' : 'new-password'}
+            minLength={6}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
 
-          <button type="submit" className={styles['button-confirm']}>
-            {isLogin ? 'Acceder' : 'Registrarse'}
+          <button type="submit" className={styles['button-confirm']} disabled={enviando}>
+            {enviando ? 'Un momento…' : isLogin ? 'Acceder' : 'Crear cuenta'}
           </button>
+
+          {isLogin && (
+            <p className={styles.switchText}>
+              <button type="button" onClick={recuperar}>¿Has olvidado la contraseña?</button>
+            </p>
+          )}
 
           <p className={styles.switchText}>
             {isLogin ? '¿No tienes cuenta?' : '¿Tienes una cuenta?'}{' '}

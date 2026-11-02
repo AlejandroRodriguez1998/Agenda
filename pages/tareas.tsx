@@ -1,237 +1,159 @@
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/router'
-import { auth, db } from '@/lib/firebaseClient'
-import ModalTarea from '@/components/ModalTarea'
-import AppShell from '@/components/AppShell'
+import { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import Swal from 'sweetalert2'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import Head from 'next/head'
-import { faCheckCircle, faClock, faPen, faTasks, faTrash } from '@fortawesome/free-solid-svg-icons'
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  orderBy,
-  query,
-  updateDoc,
-  where,
-} from 'firebase/firestore'
-import { onAuthStateChanged } from 'firebase/auth'
+import { faCheck, faListCheck, faTrophy } from '@fortawesome/free-solid-svg-icons'
+import { doc, updateDoc } from 'firebase/firestore'
+import AppShell, { EmptyState, Skeleton } from '@/components/AppShell'
+import ModalTarea from '@/components/ModalTarea'
+import { useAuth } from '@/lib/auth'
+import { useData } from '@/lib/data'
+import { db } from '@/lib/firebaseClient'
+import { daysUntil, describeDue } from '@/lib/dates'
+import { COLOR_POR_DEFECTO, type Tarea } from '@/lib/types'
+import { notifyError } from '@/lib/ui'
 
-type Tarea = {
-  id: string
-  titulo: string
-  completada: boolean
-  created_at: string
-  fecha_entrega?: string
-  asignatura_id: string
+type Filtro = 'pendientes' | 'hechas' | 'todas'
+
+const grupoDe = (tarea: Tarea) => {
+  if (tarea.completada) return 'Completadas'
+  if (!tarea.fecha_entrega) return 'Sin fecha'
+  const diff = daysUntil(tarea.fecha_entrega)
+  if (diff < 0) return 'Atrasadas'
+  if (diff === 0) return 'Hoy'
+  if (diff < 7) return 'Próximos 7 días'
+  return 'Más adelante'
 }
 
-type Asignatura = {
-  id: string
-  nombre: string
-  color?: string
-  tareas: Tarea[]
-}
+const ORDEN_GRUPOS = ['Atrasadas', 'Hoy', 'Próximos 7 días', 'Más adelante', 'Sin fecha', 'Completadas']
 
 export default function TareasPage() {
-  const router = useRouter()
-  const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
-  const [cargando, setCargando] = useState(true)
-  const [usuarioVerificado, setUsuarioVerificado] = useState(false)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [tareaEditando, setTareaEditando] = useState<Tarea | null>(null)
-  const [userId, setUserId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
+  const { tareas, asignaturas, asignaturasMap, cargando } = useData()
+  const [filtro, setFiltro] = useState<Filtro>('pendientes')
+  const [asignaturaFiltro, setAsignaturaFiltro] = useState<string | null>(null)
+  const [modal, setModal] = useState<{ open: boolean; tarea: Tarea | null }>({ open: false, tarea: null })
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.replace('/login')
-      } else {
-        setUserId(user.uid)
-        setUsuarioVerificado(true)
-        await cargarAsignaturasYtareas(user.uid)
-      }
+  const pendientes = tareas.filter((t) => !t.completada).length
+  const hechas = tareas.length - pendientes
+
+  const grupos = useMemo(() => {
+    const visibles = tareas
+      .filter((t) => (filtro === 'pendientes' ? !t.completada : filtro === 'hechas' ? t.completada : true))
+      .filter((t) => !asignaturaFiltro || t.asignatura_id === asignaturaFiltro)
+      .sort((a, b) => (a.fecha_entrega || '9999').localeCompare(b.fecha_entrega || '9999'))
+    const map = new Map<string, Tarea[]>()
+    visibles.forEach((tarea) => {
+      const grupo = grupoDe(tarea)
+      map.set(grupo, [...(map.get(grupo) ?? []), tarea])
     })
+    return ORDEN_GRUPOS.filter((g) => map.has(g)).map((g) => [g, map.get(g)!] as const)
+  }, [tareas, filtro, asignaturaFiltro])
 
-    return () => unsubscribe()
-  }, [router])
+  const asignaturasConTareas = asignaturas.filter((a) => tareas.some((t) => t.asignatura_id === a.id))
 
-  const cargarAsignaturasYtareas = async (uid: string) => {
-    setCargando(true)
-    setError(null)
-
+  const toggle = async (tarea: Tarea) => {
     try {
-      const asignaturasQuery = query(
-        collection(db, 'asignaturas'),
-        where('user_id', '==', uid),
-        orderBy('nombre')
-      )
-      const asignaturasSnapshot = await getDocs(asignaturasQuery)
-      const asignaturasData = asignaturasSnapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<Asignatura, 'id' | 'tareas'>),
-      }))
-
-      const tareasQuery = query(
-        collection(db, 'tareas'),
-        where('user_id', '==', uid),
-        orderBy('created_at', 'desc')
-      )
-      const tareasSnapshot = await getDocs(tareasQuery)
-      const tareasData = tareasSnapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<Tarea, 'id'>),
-      }))
-
-      const asignaturasConTareas: Asignatura[] = asignaturasData
-        .map((a) => ({
-          ...a,
-          tareas: tareasData?.filter((t) => t.asignatura_id === a.id) || [],
-        }))
-        .filter((a) => a.tareas.length > 0)
-
-      setAsignaturas(asignaturasConTareas)
+      await updateDoc(doc(db, 'tareas', tarea.id), { completada: !tarea.completada })
+      if (!tarea.completada) toast.success('¡Tarea completada!')
     } catch (err) {
-      const firebaseError = err as { message?: string }
-      setError(firebaseError.message || 'No se pudieron cargar las tareas.')
-    } finally {
-      setCargando(false)
+      notifyError(err, 'No se pudo actualizar la tarea')
     }
   }
-
-  const cambiarEstado = async (id: string, completada: boolean) => {
-    try {
-      await updateDoc(doc(db, 'tareas', id), { completada })
-      if (userId) await cargarAsignaturasYtareas(userId)
-    } catch (err) {
-      toast.error('No se pudo actualizar la tarea')
-    }
-  }
-
-  const eliminarTarea = async (id: string) => {
-    const result = await Swal.fire({
-      title: '¿Estás seguro?',
-      text: 'Esta acción no se puede deshacer',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
-    })
-
-    if (result.isConfirmed) {
-      try {
-        await deleteDoc(doc(db, 'tareas', id))
-        toast.success('Tarea eliminada')
-        if (userId) await cargarAsignaturasYtareas(userId)
-      } catch (err) {
-        toast.error('No se pudo eliminar la tarea')
-      }
-    }
-  }
-
-  if (!usuarioVerificado) {
-    return <p className="app-state">Verificando sesión...</p>
-  }
-
-  const todasLasTareas = asignaturas.flatMap((asignatura) => asignatura.tareas)
-  const pendientes = todasLasTareas.filter((tarea) => !tarea.completada).length
-  const completadas = todasLasTareas.filter((tarea) => tarea.completada).length
 
   return (
-    <>
-      <Head>
-        <title>Tareas</title>
-      </Head>
-      <AppShell title="Tareas" eyebrow="Productividad" onAddClick={() => {
-        setTareaEditando(null)
-        setModalVisible(true)
-      }}>
-      <main className="academic-page">
-        <section className="metric-grid">
-          <article className="metric-card">
-            <FontAwesomeIcon icon={faClock} />
-            <div><strong>{pendientes}</strong><span>Pendientes</span></div>
-          </article>
-          <article className="metric-card">
-            <FontAwesomeIcon icon={faCheckCircle} />
-            <div><strong>{completadas}</strong><span>Completadas</span></div>
-          </article>
-          <article className="metric-card">
-            <FontAwesomeIcon icon={faTasks} />
-            <div><strong>{asignaturas.length}</strong><span>Asignaturas con tareas</span></div>
-          </article>
-        </section>
-
-        {error && <div className="error-panel"><strong>No se pudieron cargar las tareas</strong><p>{error}</p></div>}
-        {cargando ? (
-          <div className="app-state">Cargando tareas...</div>
-        ) : asignaturas.length === 0 ? (
-          <div className="empty-panel">No tienes tareas aún.</div>
-        ) : (
-          <section className="stack-list">
-            {asignaturas.map((asignatura) => (
-              <article key={asignatura.id} className="page-card" style={{ '--item-color': asignatura.color || '#6c8cff' } as React.CSSProperties}>
-                <div className="card-heading">
-                  <div>
-                    <span className="color-dot" />
-                    <h2>{asignatura.nombre}</h2>
-                  </div>
-                  <span>{asignatura.tareas.filter((tarea) => !tarea.completada).length} pendientes</span>
-                </div>
-
-                <div className="task-page-list">
-                  {asignatura.tareas.map((tarea) => (
-                    <div key={tarea.id} className={`task-page-row ${tarea.completada ? 'is-done' : ''}`}>
-                      <label>
-                        <input type="checkbox" checked={tarea.completada} onChange={(e) => cambiarEstado(tarea.id, e.target.checked)} />
-                        <span>{tarea.titulo}</span>
-                      </label>
-                      {tarea.fecha_entrega && (
-                        <time>{new Date(`${tarea.fecha_entrega}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</time>
-                      )}
-                      <div className="row-actions">
-                        <button onClick={() => {
-                          setTareaEditando(tarea)
-                          setModalVisible(true)
-                        }} aria-label="Editar tarea">
-                          <FontAwesomeIcon icon={faPen} />
-                        </button>
-                        <button onClick={() => eliminarTarea(tarea.id)} aria-label="Eliminar tarea">
-                          <FontAwesomeIcon icon={faTrash} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </article>
+    <AppShell
+      title="Tareas"
+      subtitle={`${pendientes} pendiente${pendientes === 1 ? '' : 's'} · ${hechas} hecha${hechas === 1 ? '' : 's'}`}
+      onAdd={() => setModal({ open: true, tarea: null })}
+      addLabel="Nueva tarea"
+    >
+      <div className="toolbar">
+        <div className="segmented" role="tablist" aria-label="Estado">
+          {([
+            ['pendientes', `Pendientes (${pendientes})`],
+            ['hechas', `Hechas (${hechas})`],
+            ['todas', 'Todas'],
+          ] as const).map(([value, label]) => (
+            <button key={value} type="button" role="tab" aria-selected={filtro === value} className={filtro === value ? 'is-active' : ''} onClick={() => setFiltro(value)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {asignaturasConTareas.length > 1 && (
+          <div className="chips chips--scroll" aria-label="Filtrar por asignatura">
+            <button type="button" className={`chip ${!asignaturaFiltro ? 'is-active' : ''}`} onClick={() => setAsignaturaFiltro(null)}>Todas</button>
+            {asignaturasConTareas.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className={`chip ${asignaturaFiltro === a.id ? 'is-active' : ''}`}
+                style={{ '--item': asignaturasMap.get(a.id)?.color } as React.CSSProperties}
+                onClick={() => setAsignaturaFiltro(asignaturaFiltro === a.id ? null : a.id)}
+              >
+                <i className="dot" /> {a.nombre}
+              </button>
             ))}
-          </section>
+          </div>
         )}
+      </div>
 
-        {userId && (
-          <ModalTarea
-            visible={modalVisible}
-            tarea={tareaEditando
-              ? {
-                id: tareaEditando.id,
-                titulo: tareaEditando.titulo,
-                fecha_entrega: tareaEditando.fecha_entrega ?? '',
-                asignatura_id: tareaEditando.asignatura_id,
-              }
-              : undefined}
-            onClose={() => setModalVisible(false)}
-            onSuccess={() => userId && cargarAsignaturasYtareas(userId)}
-            userId={userId}
+      {cargando ? (
+        <Skeleton rows={5} />
+      ) : !grupos.length ? (
+        filtro === 'pendientes' && tareas.length ? (
+          <EmptyState icon={faTrophy} title="¡Todo hecho!" text="No te queda ninguna tarea pendiente." />
+        ) : (
+          <EmptyState
+            icon={faListCheck}
+            title="No hay tareas"
+            text="Apunta prácticas, trabajos y entregas para no olvidarte de nada."
+            action={<button type="button" className="btn btn--primary" onClick={() => setModal({ open: true, tarea: null })}>Nueva tarea</button>}
           />
-        )}
-      </main>
-      </AppShell>
-    </>
+        )
+      ) : (
+        <div className="stack">
+          {grupos.map(([grupo, lista]) => (
+            <section key={grupo} className="card">
+              <div className="card__head">
+                <h2 className={grupo === 'Atrasadas' ? 'text-danger' : undefined}>{grupo}</h2>
+                <span className="muted">{lista.length}</span>
+              </div>
+              <ul className="task-list">
+                {lista.map((tarea) => {
+                  const asignatura = asignaturasMap.get(tarea.asignatura_id)
+                  const diff = tarea.fecha_entrega ? daysUntil(tarea.fecha_entrega) : null
+                  return (
+                    <li key={tarea.id} className={`task ${tarea.completada ? 'is-done' : ''}`} style={{ '--item': asignatura?.color || COLOR_POR_DEFECTO } as React.CSSProperties}>
+                      <button type="button" className="check" onClick={() => toggle(tarea)} aria-pressed={tarea.completada} aria-label={tarea.completada ? `Marcar ${tarea.titulo} como pendiente` : `Completar ${tarea.titulo}`}>
+                        <FontAwesomeIcon icon={faCheck} />
+                      </button>
+                      <button type="button" className="task__body" onClick={() => setModal({ open: true, tarea })}>
+                        <strong>{tarea.titulo}</strong>
+                        <small><i className="dot" /> {asignatura?.nombre || 'Sin asignatura'}</small>
+                      </button>
+                      {tarea.fecha_entrega && (
+                        <span className={`due ${!tarea.completada && diff! < 0 ? 'due--late' : !tarea.completada && diff! <= 2 ? 'due--soon' : ''}`}>
+                          {describeDue(tarea.fecha_entrega)}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+
+      {user && (
+        <ModalTarea
+          open={modal.open}
+          tarea={modal.tarea}
+          asignaturaPorDefecto={asignaturaFiltro ?? undefined}
+          userId={user.uid}
+          onClose={() => setModal((s) => ({ ...s, open: false }))}
+        />
+      )}
+    </AppShell>
   )
 }

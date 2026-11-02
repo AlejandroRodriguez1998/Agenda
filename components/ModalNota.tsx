@@ -1,102 +1,97 @@
-import { useState } from 'react'
-import { db } from '@/lib/firebaseClient'
+import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebaseClient'
+import type { Nota } from '@/lib/types'
+import { notifyError } from '@/lib/ui'
+import Modal, { Field } from './Modal'
 
-type ModalNotaProps = {
-  visible: boolean
+type Props = {
+  open: boolean
   asignaturaId: string
+  asignaturaNombre?: string
   userId: string
+  nota?: Nota | null
+  /** Peso que queda por asignar (100 - suma actual), para sugerirlo. */
+  pesoRestante?: number
   onClose: () => void
-  onSuccess: () => void
 }
 
-export default function ModalNota({ visible, asignaturaId, userId, onClose, onSuccess }: ModalNotaProps) {
+const SUGERENCIAS = ['Examen parcial', 'Examen final', 'Práctica', 'Trabajo', 'Participación']
+
+const parseNumero = (value: string) => Number.parseFloat(value.replace(',', '.'))
+
+export default function ModalNota({ open, asignaturaId, asignaturaNombre, userId, nota, pesoRestante, onClose }: Props) {
   const [tipo, setTipo] = useState('')
-  const [nota, setNota] = useState('')
+  const [valor, setValor] = useState('')
   const [peso, setPeso] = useState('')
+  const [guardando, setGuardando] = useState(false)
 
-  const handleGuardar = async () => {
-    if (!tipo || !nota || !peso) {
-      toast.error('Rellena todos los campos', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-      return
-    }
+  useEffect(() => {
+    if (!open) return
+    setTipo(nota?.tipo ?? '')
+    setValor(nota ? String(nota.nota) : '')
+    setPeso(nota ? String(nota.peso) : pesoRestante && pesoRestante > 0 ? String(pesoRestante) : '')
+  }, [open, nota, pesoRestante])
 
-    if (!userId) {
-      toast.error('No hay sesión activa', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-      return
-    }
+  const guardar = async () => {
+    const numero = parseNumero(valor)
+    const pesoNumero = parseNumero(peso)
+    if (!tipo.trim()) return void toast.error('Indica qué se evalúa')
+    if (!Number.isFinite(numero) || numero < 0 || numero > 10) return void toast.error('La nota debe estar entre 0 y 10')
+    if (!Number.isFinite(pesoNumero) || pesoNumero <= 0 || pesoNumero > 100) return void toast.error('El peso debe estar entre 1 y 100')
 
+    setGuardando(true)
     try {
-      await addDoc(collection(db, 'notas_academicas'), {
-        user_id: userId,
-        asignatura_id: asignaturaId,
-        tipo,
-        nota: parseFloat(nota),
-        peso: parseFloat(peso),
-        created_at: serverTimestamp(),
-      })
-
-      toast.success('Nota añadida', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-      setTipo('')
-      setNota('')
-      setPeso('')
-      onSuccess()
+      const datos = { tipo: tipo.trim(), nota: numero, peso: pesoNumero }
+      if (nota) {
+        await updateDoc(doc(db, 'notas_academicas', nota.id), datos)
+        toast.success('Nota actualizada')
+      } else {
+        await addDoc(collection(db, 'notas_academicas'), {
+          ...datos,
+          user_id: userId,
+          asignatura_id: asignaturaId,
+          created_at: serverTimestamp(),
+        })
+        toast.success('Nota añadida')
+      }
       onClose()
     } catch (err) {
-      toast.error('Error al guardar nota', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
+      notifyError(err, 'No se pudo guardar la nota')
+    } finally {
+      setGuardando(false)
     }
   }
 
-  if (!visible) return null
-
   return (
-    <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className="modal-dialog modal-dialog-centered">
-        <div className="modal-content bg-dark text-white">
-          <div className="modal-body">
-            <div className="text-center">
-              <h3 className="mb-0">Añadir nota</h3>
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Tipo</label>
-              <input className="form-control" value={tipo} onChange={(e) => setTipo(e.target.value)} />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Nota</label>
-              <input type="number" className="form-control" value={nota} onChange={(e) => setNota(e.target.value)} min={0} max={10} />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Peso (%)</label>
-              <input type="number" className="form-control" value={peso} onChange={(e) => setPeso(e.target.value)} min={0} max={100} />
-            </div>
-            <div className="d-flex justify-content-center gap-2 mt-4">
-              <button className="btn btn-primary w-100" onClick={handleGuardar}>Añadir</button>
-              <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-            </div>
-          </div>
-        </div>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={nota ? 'Editar nota' : 'Añadir nota'}
+      subtitle={asignaturaNombre}
+      onSubmit={guardar}
+      footer={
+        <>
+          <button type="button" className="btn btn--ghost" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn btn--primary" disabled={guardando}>{nota ? 'Guardar' : 'Añadir'}</button>
+        </>
+      }
+    >
+      <Field label="Evaluación">
+        <input className="input" value={tipo} onChange={(e) => setTipo(e.target.value)} placeholder="Ej: Examen parcial" maxLength={80} list="tipos-nota" />
+        <datalist id="tipos-nota">
+          {SUGERENCIAS.map((s) => <option key={s} value={s} />)}
+        </datalist>
+      </Field>
+      <div className="field-row">
+        <Field label="Nota (0–10)">
+          <input className="input" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="7,5" />
+        </Field>
+        <Field label="Peso (%)" hint={pesoRestante !== undefined && !nota ? `Quedan ${Math.max(0, pesoRestante)}%` : undefined}>
+          <input className="input" inputMode="decimal" value={peso} onChange={(e) => setPeso(e.target.value)} placeholder="30" />
+        </Field>
       </div>
-    </div>
+    </Modal>
   )
 }

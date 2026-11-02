@@ -1,12 +1,16 @@
-// next.config.js
-const withPWA = require('next-pwa')({
-  dest: 'public',
-  disable: process.env.NODE_ENV === 'development',
-  register: true,
-  skipWaiting: true,
-})
-
-module.exports = withPWA({
+/** @type {import('next').NextConfig} */
+module.exports = {
   reactStrictMode: true,
-  turbopack: {},
-})
+  async headers() {
+    return [
+      {
+        // El service worker nunca debe quedarse cacheado por el navegador/CDN.
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+    ]
+  },
+}

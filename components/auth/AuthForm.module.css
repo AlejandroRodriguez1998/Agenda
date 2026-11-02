@@ -43,6 +43,8 @@
 }
 
 .backButton {
+  display: inline-flex;
+  align-items: center;
   min-height: 38px;
   padding: 0 14px;
   border: 1px solid var(--page-border);
@@ -200,6 +202,19 @@
   text-align: center;
 }
 
+.button-confirm:disabled {
+  opacity: 0.7;
+}
+
+.input {
+  font-size: 16px;
+}
+
+.brandButton,
+.backButton {
+  text-decoration: none;
+}
+
 .switchText button {
   border: 0;
   background: transparent;
@@ -220,7 +235,7 @@
   }
 
   .copy {
-    padding: 28px 20px;
+    display: none;
   }
 
   .copy h1 {

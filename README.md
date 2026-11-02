@@ -8,7 +8,6 @@ Construida con **Next.js**, desplegada en **Vercel**, y con **Firebase** como ba
 - [Next.js](https://nextjs.org/) — Framework de React
 - [Firebase](https://firebase.google.com/) — Backend as a Service (Auth, DB)
 - [Vercel](https://vercel.com/) — Deploy hosting
-- [Bootstrap 5](https://getbootstrap.com/) — Estilos
 
 ## 📦 Instalación local
 
@@ -71,16 +70,30 @@ https://agenda-topaz-two.vercel.app/
 
 ## 🗃 Configuración de Firebase
 
-Asegúrate de tener el proyecto creado y habilitar:
-
 ### 👤 Autenticación
 - Activa el sistema de autenticación por email + contraseña.
 
-### 📋 Colecciones necesarias (Firestore)
+### 🔒 Reglas de seguridad (Firestore)
+
+Las reglas están versionadas en [`firestore.rules`](firestore.rules): cada usuario solo puede leer y
+escribir sus propios documentos (`user_id`), no puede cambiar el dueño de un documento y los campos
+se validan (tipos, longitudes, rangos de notas, fechas `YYYY-MM-DD`...). Para publicarlas:
+
+```bash
+npm i -g firebase-tools
+firebase login
+firebase use <tu-project-id>
+firebase deploy --only firestore:rules
+```
+
+> Las consultas solo filtran por `user_id` y se ordenan en el cliente, así que **no hace falta ningún
+> índice compuesto**.
+
+### 📋 Colecciones (Firestore)
 
 #### `asignaturas`
 - `nombre` (string)
-- `color` (string)
+- `color` (string, hex)
 - `curso` (number)
 - `user_id` (string)
 - `created_at` (timestamp)
@@ -95,15 +108,15 @@ Asegúrate de tener el proyecto creado y habilitar:
 
 #### `horario`
 - `asignatura_id` (string)
-- `tipo` (string)
+- `tipo` (string: `teórica` | `laboratorio`)
 - `hora` (string, HH:mm)
-- `dias` (array de string)
+- `dias` (array de string: `lunes`…`domingo`)
 - `user_id` (string)
 
 #### `notas_academicas`
 - `tipo` (string)
-- `nota` (number)
-- `peso` (number)
+- `nota` (number, 0–10)
+- `peso` (number, 1–100)
 - `asignatura_id` (string)
 - `user_id` (string)
 - `created_at` (timestamp)
@@ -112,7 +125,24 @@ Asegúrate de tener el proyecto creado y habilitar:
 - `user_id` (string)
 - `title` (string)
 - `start` (string, YYYY-MM-DD)
-- `color` (string)
+- `color` (string, hex)
+
+## 📱 PWA
+
+- Service worker propio en [`public/sw.js`](public/sw.js) (sin `next-pwa`, que no es compatible con
+  Turbopack). Cachea los estáticos de Next y la última versión de cada página para abrir sin conexión.
+  Sube la constante `VERSION` si necesitas forzar la limpieza de cachés.
+- Firestore usa caché persistente (IndexedDB): los datos se ven al instante y los cambios hechos sin
+  conexión se sincronizan al volver.
+- Solo se registra en producción (`npm run build && npm start` para probarlo en local).
+
+## 🧱 Estructura
+
+```
+lib/          auth (sesión), data (datos en tiempo real), theme, tipos y utilidades
+components/   AppShell (navegación), Dashboard, Modal (bottom sheet) y formularios
+pages/        una página por sección; las rutas privadas se protegen en _app.tsx
+```
 
 ## 🧠 Funcionalidades
 
@@ -121,7 +151,9 @@ Asegúrate de tener el proyecto creado y habilitar:
 - ✅ Registro de notas con cálculo automático de medias
 - ✅ Calendario interactivo de eventos
 - ✅ Modal para añadir, editar y eliminar eventos
-- ✅ Estilo adaptado a escritorio y móvil
+- ✅ Diseño mobile-first con navegación inferior y formularios tipo *bottom sheet*
+- ✅ Tema claro / oscuro
+- ✅ Datos en tiempo real y funcionamiento sin conexión
 - ✅ Soporte para multicuenta (usuarios aislados por Firebase)
 
 

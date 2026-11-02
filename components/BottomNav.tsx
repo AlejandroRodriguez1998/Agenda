@@ -1,46 +1,38 @@
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { auth } from '@/lib/firebaseClient'
 import { useRouter } from 'next/router'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBook, faChartColumn, faClock, faHome, faTasks } from '@fortawesome/free-solid-svg-icons'
-import { onAuthStateChanged } from 'firebase/auth'
+import { faBook, faCalendarDays, faChartColumn, faHouse, faListCheck } from '@fortawesome/free-solid-svg-icons'
 
-export default function BottomNav() {
-  const [show, setShow] = useState(false)
+export const NAV_ITEMS = [
+  { href: '/', label: 'Inicio', icon: faHouse },
+  { href: '/horarios', label: 'Horario', icon: faCalendarDays },
+  { href: '/tareas', label: 'Tareas', icon: faListCheck },
+  { href: '/notas', label: 'Notas', icon: faChartColumn },
+  { href: '/asignaturas', label: 'Asignaturas', icon: faBook },
+]
+
+export default function BottomNav({ pendientes }: { pendientes: number }) {
   const router = useRouter()
-
-  useEffect(() => {
-    setShow(!!auth.currentUser)
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setShow(!!user)
-    })
-
-    return () => unsubscribe()
-  }, [])
-
-  if (!show) return null
-
-  const items = [
-    { href: '/', label: 'Inicio', icon: faHome },
-    { href: '/horarios', label: 'Horario', icon: faClock },
-    { href: '/asignaturas', label: 'Asignaturas', icon: faBook },
-    { href: '/tareas', label: 'Tareas', icon: faTasks },
-    { href: '/notas', label: 'Notas', icon: faChartColumn },
-  ]
 
   return (
     <nav className="bottom-nav" aria-label="Navegación principal">
-      {items.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={`bottom-nav__item ${router.pathname === item.href ? 'is-active' : ''}`}
-        >
-          <FontAwesomeIcon icon={item.icon} />
-          <span>{item.label}</span>
-        </Link>
-      ))}
+      {NAV_ITEMS.map((item) => {
+        const active = router.pathname === item.href
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`bottom-nav__item ${active ? 'is-active' : ''}`}
+            aria-current={active ? 'page' : undefined}
+          >
+            <span className="bottom-nav__icon">
+              <FontAwesomeIcon icon={item.icon} />
+              {item.href === '/tareas' && pendientes > 0 && <i className="badge-dot">{pendientes > 9 ? '9+' : pendientes}</i>}
+            </span>
+            <span>{item.label}</span>
+          </Link>
+        )
+      })}
     </nav>
   )
 }

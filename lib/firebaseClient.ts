@@ -1,6 +1,12 @@
 import { initializeApp, getApps } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,7 +17,21 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
+const isFirstInit = !getApps().length
+const app = isFirstInit ? initializeApp(firebaseConfig) : getApps()[0]
+
+// En el navegador usamos caché persistente (IndexedDB): la app abre al instante
+// con los últimos datos y funciona sin conexión, sincronizando al volver.
+const createDb = (): Firestore => {
+  if (typeof window === 'undefined' || !isFirstInit) return getFirestore(app)
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    })
+  } catch {
+    return getFirestore(app)
+  }
+}
 
 export const auth = getAuth(app)
-export const db = getFirestore(app)
+export const db = createDb()
