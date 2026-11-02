@@ -1303,10 +1303,23 @@ select.input {
   background-size: 200% 200%;
   color: #fff;
   animation: splash-gradient 8s ease-in-out infinite;
+  --splash-top: #2e2a85;
 }
 
 html[data-theme='dark'] .app-splash {
+  --splash-top: #120f33;
   background-image: linear-gradient(135deg, #0b1023 0%, #2a2580 45%, #5b21b6 75%, #9d174d 100%);
+}
+
+/* Franja superior del color de la barra de estado (theme-color en SplashScreen.tsx) */
+.app-splash::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 180px;
+  background: linear-gradient(to bottom, var(--splash-top) 0%, var(--splash-top) 18%, transparent 100%);
+  pointer-events: none;
 }
 
 /* Manchas de luz difuminadas que se desplazan por el fondo */
@@ -1346,6 +1359,7 @@ html[data-theme='dark'] .app-splash {
 
 .app-splash__content {
   position: relative;
+  z-index: 2;
   display: grid;
   justify-items: center;
   animation: splash-enter 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
@@ -1353,32 +1367,46 @@ html[data-theme='dark'] .app-splash {
 
 .app-splash__logo-wrap {
   position: relative;
-  width: 132px;
-  height: 132px;
+  width: 140px;
+  height: 140px;
   margin-bottom: 22px;
   display: grid;
   place-items: center;
 }
 
-/* Halo cónico que gira alrededor del logo */
+/* Resplandor que "respira" detrás del logo */
+.app-splash__glow {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(196, 181, 253, 0.55) 0%, rgba(196, 181, 253, 0) 70%);
+  animation: glow 2.4s ease-in-out infinite;
+}
+
+/* Aro circular tenue con un arco brillante que gira */
 .app-splash__ring {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent 0deg, rgba(255, 255, 255, 0.9) 70deg, transparent 140deg, transparent 360deg);
-  -webkit-mask: radial-gradient(circle, transparent 58px, #000 60px, #000 64px, transparent 66px);
-  mask: radial-gradient(circle, transparent 58px, #000 60px, #000 64px, transparent 66px);
-  animation: spin 1.6s linear infinite;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: spin 1.8s linear infinite;
 }
 
-/* Onda que se expande desde el logo */
-.app-splash__pulse {
-  position: absolute;
-  width: 92px;
-  height: 92px;
-  border-radius: 30px;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  animation: ripple 2s ease-out infinite;
+.app-splash__ring circle {
+  fill: none;
+  stroke-width: 3;
+}
+
+.app-splash__ring-track {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.app-splash__ring-arc {
+  stroke: #fff;
+  stroke-linecap: round;
+  stroke-dasharray: 22 78;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
 }
 
 .app-splash__logo {
@@ -1494,14 +1522,15 @@ html[data-theme='dark'] .app-splash {
   }
 }
 
-@keyframes ripple {
-  from {
-    opacity: 0.8;
-    transform: scale(1);
+@keyframes glow {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(0.9);
   }
-  to {
-    opacity: 0;
-    transform: scale(1.6);
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
   }
 }
 

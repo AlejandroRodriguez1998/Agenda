@@ -35,9 +35,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('light')
 
   useEffect(() => {
+    // themeInitScript ya aplicó el tema y el theme-color antes de pintar; aquí solo
+    // sincronizamos el estado (y no pisamos el theme-color que pone el splash).
     const initial = getStoredTheme()
     setThemeState(initial)
-    applyTheme(initial)
+    document.documentElement.dataset.theme = initial
   }, [])
 
   const setTheme = useCallback((next: Theme) => {
