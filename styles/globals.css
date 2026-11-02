@@ -647,9 +647,11 @@ select.input {
   min-height: 50px;
   border-radius: 16px;
   display: grid;
-  grid-template-rows: 22px auto;
-  place-items: center;
-  gap: 2px;
+  grid-template-rows: auto auto;
+  /* agrupa icono y texto en el centro en vez de repartir el alto entre ellos */
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
   color: var(--page-muted);
   font-size: 0.68rem;
   font-weight: 800;
