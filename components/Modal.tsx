@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faXmark } from '@fortawesome/free-solid-svg-icons'
@@ -19,8 +19,40 @@ type ModalProps = {
 export default function Modal({ open, title, subtitle, onClose, children, onSubmit, footer, accent }: ModalProps) {
   const titleId = useId()
   const [mounted, setMounted] = useState(false)
+  const layerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => setMounted(true), [])
+
+  // En iOS el teclado no redimensiona la página: ajustamos la capa al área
+  // realmente visible (visualViewport) para que la hoja quede encima del teclado.
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!open || !mounted || !viewport) return
+
+    const update = () => {
+      const layer = layerRef.current
+      if (!layer) return
+      layer.style.top = `${viewport.offsetTop}px`
+      layer.style.height = `${viewport.height}px`
+      layer.classList.toggle('has-keyboard', window.innerHeight - viewport.height > 120)
+    }
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.matches('input, select, textarea')) return
+      // Espera a que el teclado termine de aparecer antes de centrar el campo.
+      window.setTimeout(() => target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 300)
+    }
+
+    update()
+    viewport.addEventListener('resize', update)
+    viewport.addEventListener('scroll', update)
+    document.addEventListener('focusin', onFocusIn)
+    return () => {
+      viewport.removeEventListener('resize', update)
+      viewport.removeEventListener('scroll', update)
+      document.removeEventListener('focusin', onFocusIn)
+    }
+  }, [open, mounted])
 
   useEffect(() => {
     if (!open) return
@@ -60,7 +92,7 @@ export default function Modal({ open, title, subtitle, onClose, children, onSubm
   )
 
   return createPortal(
-    <div className="sheet-layer" onMouseDown={onClose}>
+    <div ref={layerRef} className="sheet-layer" onMouseDown={onClose}>
       <div
         className="sheet"
         role="dialog"

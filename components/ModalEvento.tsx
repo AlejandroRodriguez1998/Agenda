@@ -77,7 +77,7 @@ export default function ModalEvento({ open, onClose, userId, fechaPorDefecto, ev
       }
     >
       <Field label="Título">
-        <input className="input" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej: Examen de historia" maxLength={120} autoFocus={!evento} />
+        <input className="input" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej: Examen de historia" maxLength={120} name="evento-titulo" autoComplete="off" autoCapitalize="sentences" enterKeyHint="done" />
       </Field>
       <Field label="Fecha">
         <input type="date" className="input" value={fecha} onChange={(e) => setFecha(e.target.value)} />

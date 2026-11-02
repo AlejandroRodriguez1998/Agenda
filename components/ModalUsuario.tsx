@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMoon, faRightFromBracket, faSun } from '@fortawesome/free-solid-svg-icons'
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth'
 import Modal, { Field } from './Modal'
-import { cerrarSesion, useAuth } from '@/lib/auth'
+import { cerrarSesion, nombreVisible, useAuth } from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
 
 export const iniciales = (nombre?: string | null, email?: string | null) =>
@@ -56,7 +56,7 @@ export default function ModalUsuario({ open, onClose }: { open: boolean; onClose
       <div className="profile-card">
         <span className="avatar avatar--lg">{iniciales(user?.displayName, user?.email)}</span>
         <div>
-          <strong>{user?.displayName || user?.email?.split('@')[0]}</strong>
+          <strong>{nombreVisible(user)}</strong>
           <span>{user?.email}</span>
         </div>
       </div>

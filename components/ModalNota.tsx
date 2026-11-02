@@ -79,17 +79,17 @@ export default function ModalNota({ open, asignaturaId, asignaturaNombre, userId
       }
     >
       <Field label="Evaluación">
-        <input className="input" value={tipo} onChange={(e) => setTipo(e.target.value)} placeholder="Ej: Examen parcial" maxLength={80} list="tipos-nota" />
+        <input className="input" value={tipo} onChange={(e) => setTipo(e.target.value)} placeholder="Ej: Examen parcial" maxLength={80} list="tipos-nota" name="nota-tipo" autoComplete="off" autoCapitalize="sentences" />
         <datalist id="tipos-nota">
           {SUGERENCIAS.map((s) => <option key={s} value={s} />)}
         </datalist>
       </Field>
       <div className="field-row">
         <Field label="Nota (0–10)">
-          <input className="input" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="7,5" />
+          <input className="input" inputMode="decimal" name="nota-valor" autoComplete="off" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="7,5" />
         </Field>
         <Field label="Peso (%)" hint={pesoRestante !== undefined && !nota ? `Quedan ${Math.max(0, pesoRestante)}%` : undefined}>
-          <input className="input" inputMode="decimal" value={peso} onChange={(e) => setPeso(e.target.value)} placeholder="30" />
+          <input className="input" inputMode="decimal" name="nota-peso" autoComplete="off" value={peso} onChange={(e) => setPeso(e.target.value)} placeholder="30" />
         </Field>
       </div>
     </Modal>

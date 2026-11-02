@@ -32,3 +32,14 @@ export const cerrarSesion = async () => {
 /** Solo acepta rutas internas como destino tras el login (evita redirecciones abiertas). */
 export const safeNext = (value: unknown) =>
   typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : '/'
+
+/** Apodos por usuario (parte del correo antes de la @, en minúsculas). */
+const APODOS: Record<string, string> = {
+  alexcr31: 'Alec',
+}
+
+/** Nombre con el que la app se dirige al usuario. */
+export const nombreVisible = (user: Pick<User, 'displayName' | 'email'> | null) => {
+  const usuario = user?.email?.split('@')[0] ?? ''
+  return APODOS[usuario.toLowerCase()] || user?.displayName?.split(' ')[0] || usuario
+}

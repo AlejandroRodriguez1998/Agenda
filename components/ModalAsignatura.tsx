@@ -107,7 +107,7 @@ export default function ModalAsignatura({ open, onClose, userId, asignatura, cur
       }
     >
       <Field label="Nombre">
-        <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Sistemas Distribuidos" maxLength={80} autoFocus />
+        <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Sistemas Distribuidos" maxLength={80} name="asignatura-nombre" autoComplete="off" autoCapitalize="sentences" enterKeyHint="done" />
       </Field>
 
       <Field label="Curso">

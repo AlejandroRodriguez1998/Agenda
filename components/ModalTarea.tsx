@@ -94,7 +94,7 @@ export default function ModalTarea({ open, onClose, userId, tarea, asignaturaPor
       }
     >
       <Field label="Título">
-        <input className="input" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej: Práctica 2 de redes" maxLength={140} autoFocus={!tarea} />
+        <input className="input" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej: Práctica 2 de redes" maxLength={140} name="tarea-titulo" autoComplete="off" autoCapitalize="sentences" enterKeyHint="done" />
       </Field>
 
       <Field label="Asignatura">

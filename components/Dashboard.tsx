@@ -19,7 +19,7 @@ import Modal from './Modal'
 import ModalEvento from './ModalEvento'
 import ModalHorario from './ModalHorario'
 import ModalTarea from './ModalTarea'
-import { useAuth } from '@/lib/auth'
+import { nombreVisible, useAuth } from '@/lib/auth'
 import { useData } from '@/lib/data'
 import { db } from '@/lib/firebaseClient'
 import {
@@ -234,7 +234,7 @@ export default function Dashboard() {
     else if (item.horario) setHorarioModal({ open: true, horario: item.horario })
   }
 
-  const nombre = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || ''
+  const nombre = nombreVisible(user)
   const selectedItems = itemsPorFecha[selected] || []
 
   const agenda = (
