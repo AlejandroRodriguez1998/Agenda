@@ -1,0 +1,196 @@
+rules_version = '2';
+
+// Reglas de Agenda Académica.
+// Cada documento pertenece a un usuario mediante el campo `user_id`.
+// - Solo el dueño puede leer, crear, modificar o borrar sus documentos.
+// - `user_id` no se puede cambiar una vez creado.
+// - Al crear se valida el documento completo; al actualizar solo se validan
+//   los campos que cambian (con || en línea, que cortocircuita), para no
+//   bloquear la edición de documentos antiguos a los que les falte algún campo.
+// Despliegue: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers generales ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return signedIn() && resource.data.user_id == request.auth.uid;
+    }
+
+    function createsOwn() {
+      return signedIn() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    function data() {
+      return request.resource.data;
+    }
+
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function keepsOwner() {
+      return !changed().hasAny(['user_id']);
+    }
+
+    function text(value, max) {
+      return value is string && value.size() > 0 && value.size() <= max;
+    }
+
+    function isDateKey(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isColor(value) {
+      return value is string && value.matches('^#[0-9a-fA-F]{3,8}$');
+    }
+
+    function isHour(value) {
+      return value is string && value.matches('^[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?$');
+    }
+
+    function isDayList(value) {
+      return value is list && value.size() > 0 && value.size() <= 7
+        && value.hasOnly(['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']);
+    }
+
+    function isCreationTime(value) {
+      return value == request.time;
+    }
+
+    // Referencia a una asignatura del mismo usuario.
+    function ownsSubject(id) {
+      return id is string
+        && exists(/databases/$(database)/documents/asignaturas/$(id))
+        && get(/databases/$(database)/documents/asignaturas/$(id)).data.user_id == request.auth.uid;
+    }
+
+    // ---------- estudios ----------
+
+    function validStudyType(value) {
+      return value in ['Grado', 'Máster', 'Doctorado', 'FP', 'Curso', 'Otro'];
+    }
+
+    match /estudios/{id} {
+      allow read, delete: if isOwner();
+      allow create: if createsOwn()
+        && text(data().nombre, 120)
+        && validStudyType(data().tipo)
+        && (!data().keys().hasAny(['por_defecto']) || data().por_defecto is bool)
+        && isCreationTime(data().created_at);
+      allow update: if isOwner() && keepsOwner()
+        && changed().hasOnly(['nombre', 'tipo'])
+        && text(data().nombre, 120)
+        && validStudyType(data().tipo);
+    }
+
+    // ---------- asignaturas ----------
+    // { nombre: string, color: string, curso: int, user_id, created_at }
+
+    function validCurso(value) {
+      return value is int && value >= 1 && value <= 10;
+    }
+
+    match /asignaturas/{id} {
+      allow read, delete: if isOwner();
+      allow create: if createsOwn()
+        && text(data().nombre, 120)
+        && isColor(data().color)
+        && validCurso(data().curso)
+        && isCreationTime(data().created_at);
+      allow update: if isOwner() && keepsOwner()
+        && (!changed().hasAny(['nombre']) || text(data().nombre, 120))
+        && (!changed().hasAny(['color']) || isColor(data().color))
+        && (!changed().hasAny(['curso']) || validCurso(data().curso));
+    }
+
+    // ---------- tareas ----------
+    // { titulo, fecha_entrega: 'YYYY-MM-DD' | null, asignatura_id, completada: bool, user_id, created_at }
+
+    function validFecha(value) {
+      return value == null || isDateKey(value);
+    }
+
+    match /tareas/{id} {
+      allow read, delete: if isOwner();
+      allow create: if createsOwn()
+        && text(data().titulo, 200)
+        && validFecha(data().fecha_entrega)
+        && ownsSubject(data().asignatura_id)
+        && data().completada == false
+        && isCreationTime(data().created_at);
+      allow update: if isOwner() && keepsOwner()
+        && (!changed().hasAny(['titulo']) || text(data().titulo, 200))
+        && (!changed().hasAny(['fecha_entrega']) || validFecha(data().fecha_entrega))
+        && (!changed().hasAny(['asignatura_id']) || ownsSubject(data().asignatura_id))
+        && (!changed().hasAny(['completada']) || data().completada is bool);
+    }
+
+    // ---------- horario ----------
+    // { asignatura_id, tipo, hora: 'HH:mm', dias: [string], user_id }
+
+    match /horario/{id} {
+      allow read, delete: if isOwner();
+      allow create: if createsOwn()
+        && ownsSubject(data().asignatura_id)
+        && text(data().tipo, 40)
+        && isHour(data().hora)
+        && isDayList(data().dias);
+      allow update: if isOwner() && keepsOwner()
+        && (!changed().hasAny(['asignatura_id']) || ownsSubject(data().asignatura_id))
+        && (!changed().hasAny(['tipo']) || text(data().tipo, 40))
+        && (!changed().hasAny(['hora']) || isHour(data().hora))
+        && (!changed().hasAny(['dias']) || isDayList(data().dias));
+    }
+
+    // ---------- notas_academicas ----------
+    // { tipo, nota: 0-10, peso: 0-100, asignatura_id, user_id, created_at }
+
+    function validNota(value) {
+      return value is number && value >= 0 && value <= 10;
+    }
+
+    function validPeso(value) {
+      return value is number && value > 0 && value <= 100;
+    }
+
+    match /notas_academicas/{id} {
+      allow read, delete: if isOwner();
+      allow create: if createsOwn()
+        && text(data().tipo, 120)
+        && validNota(data().nota)
+        && validPeso(data().peso)
+        && ownsSubject(data().asignatura_id)
+        && isCreationTime(data().created_at);
+      allow update: if isOwner() && keepsOwner()
+        && !changed().hasAny(['asignatura_id'])
+        && (!changed().hasAny(['tipo']) || text(data().tipo, 120))
+        && (!changed().hasAny(['nota']) || validNota(data().nota))
+        && (!changed().hasAny(['peso']) || validPeso(data().peso));
+    }
+
+    // ---------- eventos ----------
+    // { title, start: 'YYYY-MM-DD', color, user_id }
+
+    match /eventos/{id} {
+      allow read, delete: if isOwner();
+      allow create: if createsOwn()
+        && text(data().title, 200)
+        && isDateKey(data().start)
+        && isColor(data().color);
+      allow update: if isOwner() && keepsOwner()
+        && (!changed().hasAny(['title']) || text(data().title, 200))
+        && (!changed().hasAny(['start']) || isDateKey(data().start))
+        && (!changed().hasAny(['color']) || isColor(data().color));
+    }
+
+    // Todo lo demás, denegado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,12 +1,10 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import toast from 'react-hot-toast'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useEstudio } from './EstudioContext'
 import { TIPOS_ESTUDIO, type Estudio, type TipoEstudio } from '@/lib/estudios'
-
-const toastStyle = { style: { background: '#1a1a1a', color: '#fff' } }
+import { confirmar } from '@/lib/ui'
 
 type Formulario = { modo: 'crear' } | { modo: 'editar'; estudio: Estudio }
 
@@ -31,44 +29,40 @@ export default function EstudioSelector() {
   }
 
   const guardar = async () => {
-    if (!formulario) return
-    if (!nombre.trim()) return toast.error('Ponle un nombre', toastStyle)
+    if (!formulario || guardando) return
+    if (!nombre.trim()) return toast.error('Ponle un nombre')
     setGuardando(true)
     try {
       if (formulario.modo === 'crear') {
         await nuevoEstudio({ nombre, tipo })
-        toast.success(`${tipo} "${nombre.trim()}" creado`, toastStyle)
+        toast.success(`${tipo} "${nombre.trim()}" creado`)
       } else {
         await editarEstudio(formulario.estudio.id, { nombre, tipo })
-        toast.success('Estudio actualizado', toastStyle)
+        toast.success('Estudio actualizado')
       }
       setFormulario(null)
     } catch (err) {
       const firebaseError = err as { message?: string }
-      toast.error(firebaseError.message || 'No se pudo guardar', toastStyle)
+      toast.error(firebaseError.message || 'No se pudo guardar')
     } finally {
       setGuardando(false)
     }
   }
 
   const eliminar = async (estudio: Estudio) => {
-    const confirmar = await Swal.fire({
+    const confirmado = await confirmar({
       title: `¿Eliminar "${estudio.nombre}"?`,
       text: 'Se borrarán también sus asignaturas, horarios, tareas, notas y eventos. No se puede deshacer.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      confirmButtonText: 'Sí, eliminar todo',
-      cancelButtonText: 'Cancelar',
+      confirmText: 'Sí, eliminar todo',
     })
-    if (!confirmar.isConfirmed) return
+    if (!confirmado) return
     try {
       await borrarEstudio(estudio.id)
       setFormulario(null)
-      toast.success('Estudio eliminado', toastStyle)
+      toast.success('Estudio eliminado')
     } catch (err) {
       const firebaseError = err as { message?: string }
-      toast.error(firebaseError.message || 'No se pudo eliminar', toastStyle)
+      toast.error(firebaseError.message || 'No se pudo eliminar')
     }
   }
 
@@ -76,42 +70,43 @@ export default function EstudioSelector() {
 
   if (formulario) {
     return (
-      <div className="estudio-form">
-        <label className="form-label">Modalidad</label>
-        <div className="estudio-tipos mb-3">
+      <form className="estudio-form" onSubmit={(event) => { event.preventDefault(); void guardar() }}>
+        <span className="field__label" id="estudio-modalidad">Modalidad</span>
+        <div className="estudio-tipos" role="group" aria-labelledby="estudio-modalidad">
           {TIPOS_ESTUDIO.map((t) => (
-            <button key={t} type="button" className={t === tipo ? 'is-active' : ''} onClick={() => setTipo(t)}>
+            <button key={t} type="button" className={t === tipo ? 'is-active' : ''} onClick={() => setTipo(t)} aria-pressed={t === tipo}>
               {t}
             </button>
           ))}
         </div>
 
-        <label className="form-label">Nombre</label>
+        <label className="field__label" htmlFor="estudio-nombre">Nombre</label>
         <input
+          id="estudio-nombre"
           type="text"
-          className="form-control mb-3"
+          className="input"
+          maxLength={120}
           placeholder={tipo === 'Máster' ? 'Ej. Máster en Ciencia de Datos' : 'Ej. Ingeniería Informática'}
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && guardar()}
           autoFocus
         />
 
-        <div className="d-flex gap-2">
-          <button className="btn btn-primary w-100" onClick={guardar} disabled={guardando}>
+        <div className="estudio-form__actions">
+          <button type="submit" className="btn btn--primary" disabled={guardando}>
             {formulario.modo === 'crear' ? 'Crear estudio' : 'Guardar'}
           </button>
-          <button className="btn btn-secondary" onClick={() => setFormulario(null)}>
+          <button type="button" className="btn btn--ghost" onClick={() => setFormulario(null)} disabled={guardando}>
             Cancelar
           </button>
         </div>
 
         {formulario.modo === 'editar' && estudios.length > 1 && (
-          <button className="btn btn-outline-secondary w-100 mt-2 estudio-borrar" onClick={() => eliminar(formulario.estudio)}>
+          <button type="button" className="btn btn--danger-soft btn--block" onClick={() => eliminar(formulario.estudio)} disabled={guardando}>
             <FontAwesomeIcon icon={faTrash} /> Eliminar este estudio
           </button>
         )}
-      </div>
+      </form>
     )
   }
 

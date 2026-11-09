@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
-import { auth } from '@/lib/firebaseClient'
+import { useAuth } from '@/lib/auth'
 import {
   actualizarEstudio,
   cargarOMigrarEstudios,
@@ -46,41 +45,39 @@ const guardar = (uid: string, id: string) => {
 }
 
 export function EstudioProvider({ children }: { children: ReactNode }) {
-  const [uid, setUid] = useState<string | null>(null)
+  const { user, ready } = useAuth()
+  const uid = user?.uid ?? null
   const [estudios, setEstudios] = useState<Estudio[]>([])
   const [estudioId, setEstudioId] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const inicializar = useCallback(async (userId: string) => {
-    setCargando(true)
-    setError(null)
-    try {
-      const lista = await cargarOMigrarEstudios(userId)
-      setEstudios(lista)
-      const guardado = leerGuardado(userId)
-      setEstudioId(lista.some((e) => e.id === guardado) ? guardado : lista[0]?.id ?? null)
-    } catch (err) {
-      const firebaseError = err as { message?: string }
-      setError(firebaseError.message || 'No se pudieron cargar tus estudios.')
-    } finally {
-      setCargando(false)
-    }
-  }, [])
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUid(user?.uid ?? null)
-      if (user) {
-        inicializar(user.uid)
-      } else {
-        setEstudios([])
-        setEstudioId(null)
-        setCargando(false)
+    let cancelado = false
+    setEstudios([])
+    setEstudioId(null)
+    setError(null)
+    setCargando(!ready || !!uid)
+    if (!uid) return
+
+    const inicializar = async () => {
+      try {
+        const lista = await cargarOMigrarEstudios(uid)
+        if (cancelado) return
+        setEstudios(lista)
+        const guardado = leerGuardado(uid)
+        setEstudioId(lista.some((e) => e.id === guardado) ? guardado : lista[0]?.id ?? null)
+      } catch (err) {
+        if (cancelado) return
+        const firebaseError = err as { message?: string }
+        setError(firebaseError.message || 'No se pudieron cargar tus estudios.')
+      } finally {
+        if (!cancelado) setCargando(false)
       }
-    })
-    return () => unsubscribe()
-  }, [inicializar])
+    }
+    void inicializar()
+    return () => { cancelado = true }
+  }, [uid, ready])
 
   const seleccionarEstudio = useCallback(
     (id: string) => {

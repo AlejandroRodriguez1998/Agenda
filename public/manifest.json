@@ -1,21 +1,33 @@
 {
-  "name": "Agenda Escolar",
+  "id": "/",
+  "name": "Agenda Académica",
   "short_name": "Agenda",
+  "description": "Organiza horarios, tareas, entregas y notas de tus asignaturas.",
+  "lang": "es",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#1e1e1e",
-  "theme_color": "#1e1e1e",
   "orientation": "portrait",
+  "background_color": "#f5f6fb",
+  "theme_color": "#f5f6fb",
+  "categories": ["education", "productivity"],
   "icons": [
     {
       "src": "/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
+  ],
+  "shortcuts": [
+    { "name": "Tareas", "short_name": "Tareas", "url": "/tareas", "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }] },
+    { "name": "Horario", "short_name": "Horario", "url": "/horarios", "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }] },
+    { "name": "Notas", "short_name": "Notas", "url": "/notas", "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }] }
   ]
 }

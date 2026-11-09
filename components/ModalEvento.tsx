@@ -1,138 +1,93 @@
 import { useEffect, useState } from 'react'
-import { db } from '@/lib/firebaseClient'
 import toast from 'react-hot-toast'
-import { addDoc, collection, doc, updateDoc } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebaseClient'
 import { useEstudio } from './EstudioContext'
+import { COLOR_POR_DEFECTO, type Evento } from '@/lib/types'
+import { confirmar, notifyError } from '@/lib/ui'
+import Modal, { ColorPicker, Field } from './Modal'
 
-type EventoEditable = {
-  id?: string
-  title?: string
-  color?: string
-}
-
-type ModalEventoProps = {
-  visible: boolean
+type Props = {
+  open: boolean
   onClose: () => void
-  onSuccess: () => void
   userId: string
   fechaPorDefecto: string
-  evento: EventoEditable | null
+  evento: Evento | null
 }
 
-export default function ModalEvento({
-  visible,
-  onClose,
-  onSuccess,
-  userId,
-  fechaPorDefecto,
-  evento
-}: ModalEventoProps) {
+export default function ModalEvento({ open, onClose, userId, fechaPorDefecto, evento }: Props) {
   const { estudioId } = useEstudio()
   const [titulo, setTitulo] = useState('')
-  const [color, setColor] = useState('#0d6efd')
+  const [fecha, setFecha] = useState('')
+  const [color, setColor] = useState(COLOR_POR_DEFECTO)
+  const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
-    if (evento) {
-      setTitulo(evento.title || '')
-      setColor(evento.color?.toString() || '#0d6efd')
-    } else {
-      setTitulo('')
-      setColor('#0d6efd')
-    }
-  }, [evento])
+    if (!open) return
+    setTitulo(evento?.title ?? '')
+    setFecha(evento?.start ?? fechaPorDefecto)
+    setColor(evento?.color ?? COLOR_POR_DEFECTO)
+  }, [open, evento, fechaPorDefecto])
 
-  const guardarEvento = async () => {
-    if (!titulo.trim()) {
-      toast.error('El título no puede estar vacío', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-      return
-    }
+  const guardar = async () => {
+    if (!estudioId) return void toast.error('Espera a que se cargue tu estudio')
+    if (!titulo.trim()) return void toast.error('El título no puede estar vacío')
+    if (!fecha) return void toast.error('Elige una fecha')
 
-    if (evento?.id) {
-      // Editar
-      try {
-        await updateDoc(doc(db, 'eventos', evento.id), { title: titulo, color })
-        onSuccess()
-        onClose()
-      } catch (err) {
-        toast.error('No se pudo actualizar el evento', {
-          style: {
-            background: '#1a1a1a',
-            color: '#fff',
-          },
-        })
+    setGuardando(true)
+    try {
+      const datos = { title: titulo.trim(), start: fecha, color }
+      if (evento) {
+        await updateDoc(doc(db, 'eventos', evento.id), datos)
+        toast.success('Evento actualizado')
+      } else {
+        await addDoc(collection(db, 'eventos'), { ...datos, user_id: userId, estudio_id: estudioId })
+        toast.success('Evento creado')
       }
-    } else {
-      // Añadir
-      try {
-        await addDoc(collection(db, 'eventos'), {
-          user_id: userId,
-          estudio_id: estudioId,
-          title: titulo,
-          start: fechaPorDefecto,
-          color,
-        })
-        setTitulo('')
-        setColor('#0d6efd')
-        onSuccess()
-        onClose()
-      } catch (err) {
-        toast.error('No se pudo crear el evento', {
-          style: {
-            background: '#1a1a1a',
-            color: '#fff',
-          },
-        })
-      }
+      onClose()
+    } catch (err) {
+      notifyError(err, 'No se pudo guardar el evento')
+    } finally {
+      setGuardando(false)
     }
   }
 
-  if (!visible) return null
+  const eliminar = async () => {
+    if (!evento) return
+    if (!(await confirmar({ title: '¿Eliminar evento?', text: evento.title }))) return
+    try {
+      await deleteDoc(doc(db, 'eventos', evento.id))
+      toast.success('Evento eliminado')
+      onClose()
+    } catch (err) {
+      notifyError(err, 'No se pudo eliminar el evento')
+    }
+  }
 
   return (
-    <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className="modal-dialog modal-dialog-centered">
-        <div className="modal-content bg-dark text-white">
-          <div className="modal-body">
-            <div className="text-center mb-3">
-              <h3 className="modal-title">
-                {evento ? 'Editar evento' : 'Nuevo evento'}
-              </h3>
-            </div>
-
-            <div className="d-flex align-items-center mb-3">
-              <input
-                type="text"
-                className="form-control me-2 flex-grow-1"
-                value={titulo}
-                onChange={(e) => setTitulo(e.target.value)}
-                placeholder="Ej: Examen de historia"
-              />
-
-              <input
-                type="color"
-                className="form-control form-control-color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                style={{ width: '3rem', padding: 0 }}
-                title="Color del evento"
-              />
-            </div>
-            <div className="d-flex justify-content-center gap-2 mt-4">
-              <button className="btn btn-primary w-100" onClick={guardarEvento}>
-                {evento ? 'Guardar cambios' : 'Crear evento'}
-              </button>
-              <button className="btn btn-secondary" onClick={onClose}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={evento ? 'Editar evento' : 'Nuevo evento'}
+      accent={color}
+      onSubmit={guardar}
+      footer={
+        <>
+          {evento && <button type="button" className="btn btn--danger-soft sheet__footer-start" onClick={eliminar}>Eliminar</button>}
+          <button type="button" className="btn btn--ghost" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn btn--primary" disabled={guardando}>{evento ? 'Guardar' : 'Crear'}</button>
+        </>
+      }
+    >
+      <Field label="Título">
+        <input className="input" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej: Examen de historia" maxLength={120} name="evento-titulo" autoComplete="off" autoCapitalize="sentences" enterKeyHint="done" />
+      </Field>
+      <Field label="Fecha">
+        <input type="date" className="input" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+      </Field>
+      <Field label="Color">
+        <ColorPicker value={color} onChange={setColor} />
+      </Field>
+    </Modal>
   )
 }

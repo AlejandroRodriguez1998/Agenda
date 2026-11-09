@@ -1,78 +1,60 @@
-// pages/verificar.tsx
-import { useEffect, useState } from 'react'
-import { auth } from '@/lib/firebaseClient'
+import { useEffect, useRef, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { applyActionCode, onAuthStateChanged } from 'firebase/auth'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faCircleCheck, faCircleExclamation, faSpinner } from '@fortawesome/free-solid-svg-icons'
+import { applyActionCode } from 'firebase/auth'
+import { auth } from '@/lib/firebaseClient'
+import { useAuth } from '@/lib/auth'
+
+type Estado = 'verificando' | 'ok' | 'error'
 
 export default function VerificarPage() {
   const router = useRouter()
-  const [verificando, setVerificando] = useState(true)
-  const [estado, setEstado] = useState<'ok' | 'error' | null>(null)
+  const { user } = useAuth()
+  const [estado, setEstado] = useState<Estado>('verificando')
+  const started = useRef(false)
 
+  // Se aplica el código siempre, haya sesión o no: tras registrarse el usuario
+  // ya tiene sesión abierta y antes se le redirigía sin verificar el correo.
   useEffect(() => {
-    const verificar = async () => {
-      const url = new URL(window.location.href)
-      const oobCode = url.searchParams.get('oobCode')
+    if (!router.isReady || started.current) return
+    started.current = true
+    const oobCode = typeof router.query.oobCode === 'string' ? router.query.oobCode : null
+    if (!oobCode) return setEstado('error')
 
-      let error = null
-      if (oobCode) {
-        try {
-          await applyActionCode(auth, oobCode)
-        } catch (err) {
-          error = err
-        }
-      } else {
-        error = { message: 'No se encontró el código de verificación en la URL.' }
-      }
+    applyActionCode(auth, oobCode)
+      .then(async () => {
+        await auth.currentUser?.reload().catch(() => {})
+        setEstado('ok')
+      })
+      .catch(() => setEstado('error'))
+  }, [router.isReady, router.query.oobCode])
 
-      setVerificando(false)
-      setEstado(error ? 'error' : 'ok')
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace('/')
-        return
-      }
-
-      verificar()
-    })
-
-    return () => unsubscribe()
-  }, [router])
+  const contenido = {
+    verificando: { icon: faSpinner, title: 'Verificando tu correo…', text: 'Un momento, estamos confirmando tu cuenta.' },
+    ok: { icon: faCircleCheck, title: 'Cuenta verificada', text: 'Tu correo ha sido confirmado correctamente.' },
+    error: { icon: faCircleExclamation, title: 'No se pudo verificar', text: 'El enlace no es válido o ha caducado. Vuelve a abrirlo desde el último correo recibido.' },
+  }[estado]
 
   return (
     <>
       <Head>
-        <title>Verificación de cuenta</title>
+        <title>Verificación · Agenda</title>
       </Head>
-
-      <div className="container text-white text-center py-5">
-        {verificando && (
-          <>
-            <h1 className="mb-3">🔄 Verificando cuenta...</h1>
-            <p>Estamos confirmando tu correo electrónico.</p>
-          </>
-        )}
-
-        {estado === 'error' && (
-          <>
-            <h1 className="mb-3">❌ Error al verificar</h1>
-            <p className="mb-4">No se pudo confirmar tu correo. Intenta acceder desde el enlace de verificación otra vez.</p>
-            <Link href="/" className="btn btn-outline-light">Volver al inicio</Link>
-          </>
-        )}
-
-        {estado === 'ok' && (
-          <>
-            <h1 className="mb-3">✅ Cuenta verificada</h1>
-            <p className="mb-4">Tu correo ha sido confirmado. Ya puedes iniciar sesión.</p>
-            <Link href="/login" className="btn btn-outline-light">Ir a iniciar sesión</Link>
-          </>
-        )}
-      </div>
+      <main className="center-screen">
+        <div className={`status-card status-card--${estado}`}>
+          <span className="status-card__icon"><FontAwesomeIcon icon={contenido.icon} spin={estado === 'verificando'} /></span>
+          <h1>{contenido.title}</h1>
+          <p>{contenido.text}</p>
+          {estado !== 'verificando' && (
+            <Link href={user ? '/' : '/login'} className="btn btn--primary btn--block">
+              {user ? 'Ir a mi agenda' : 'Iniciar sesión'}
+            </Link>
+          )}
+        </div>
+      </main>
     </>
   )
 }

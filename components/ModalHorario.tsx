@@ -1,228 +1,129 @@
 import { useEffect, useState } from 'react'
-import { db } from '@/lib/firebaseClient'
 import toast from 'react-hot-toast'
-import {
-  addDoc,
-  collection,
-  doc,
-  getDocs,
-  orderBy,
-  query,
-  updateDoc,
-  where,
-} from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebaseClient'
 import { useEstudio } from './EstudioContext'
-
-type Horario = {
-  id: string
-  asignatura_id: string
-  tipo: 'teórica' | 'laboratorio'
-  hora: string
-  dias: string[]
-}
+import { useData } from '@/lib/data'
+import { DIAS_SEMANA, type Horario } from '@/lib/types'
+import { confirmar, notifyError } from '@/lib/ui'
+import Modal, { Field } from './Modal'
+import SelectAsignatura from './SelectAsignatura'
 
 type Props = {
-  visible: boolean
+  open: boolean
   onClose: () => void
-  onSuccess: () => void
   userId: string
   horario?: Horario | null
+  diaPorDefecto?: string
 }
 
-type Asignatura = {
-  id: string
-  nombre: string
-  curso: number
-}
+const TIPOS = [
+  { value: 'teórica', label: 'Teórica' },
+  { value: 'laboratorio', label: 'Laboratorio' },
+]
 
-const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
-
-export default function ModalHorario({ visible, onClose, onSuccess, horario, userId }: Props) {
-  const { estudioId, esDelEstudioActivo } = useEstudio()
-  const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
+export default function ModalHorario({ open, onClose, userId, horario, diaPorDefecto }: Props) {
+  const { estudioId } = useEstudio()
+  const { asignaturasMap } = useData()
   const [asignaturaId, setAsignaturaId] = useState('')
-  const [tipo, setTipo] = useState<'teórica' | 'laboratorio'>('teórica')
+  const [tipo, setTipo] = useState<string>('teórica')
   const [hora, setHora] = useState('')
   const [dias, setDias] = useState<string[]>([])
+  const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
-    const cargarAsignaturas = async () => {
-      if (!userId) return
-      const q = query(
-        collection(db, 'asignaturas'),
-        where('user_id', '==', userId),
-        orderBy('curso'),
-        orderBy('nombre')
-      )
-      const snapshot = await getDocs(q)
-      const data = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<Asignatura, 'id'> & { estudio_id?: string }),
-      }))
-      setAsignaturas(data.filter(esDelEstudioActivo))
-    }
+    if (!open) return
+    setAsignaturaId(horario?.asignatura_id ?? '')
+    setTipo(horario?.tipo ?? 'teórica')
+    setHora(horario?.hora ?? '')
+    setDias(horario?.dias ?? (diaPorDefecto ? [diaPorDefecto] : []))
+  }, [open, horario, diaPorDefecto])
 
-    cargarAsignaturas()
-  }, [userId, estudioId, esDelEstudioActivo])
-
-  useEffect(() => {
-    if (horario) {
-      setAsignaturaId(horario.asignatura_id)
-      setTipo(horario.tipo)
-      setHora(horario.hora)
-      setDias(horario.dias || [])
-    } else {
-      setAsignaturaId('')
-      setTipo('teórica')
-      setHora('')
-      setDias([])
-    }
-  }, [horario])
-
-  const asignaturasPorCurso = asignaturas.reduce((acc, a) => {
-    if (!acc[a.curso]) acc[a.curso] = []
-    acc[a.curso].push(a)
-    return acc
-  }, {} as Record<string, Asignatura[]>)
-
-  const toggleDia = (dia: string) => {
-    if (dias.includes(dia)) {
-      setDias(dias.filter(d => d !== dia))
-    } else {
-      setDias([...dias, dia])
-    }
-  }
+  const toggleDia = (dia: string) =>
+    setDias((current) => (current.includes(dia) ? current.filter((d) => d !== dia) : [...current, dia]))
 
   const guardar = async () => {
-    if (!asignaturaId || !hora || dias.length === 0) {
-      toast.error('Rellena todos los campos', {
-        style: { background: '#1a1a1a', color: '#fff' },
-      })
-      return
-    }
+    if (!estudioId) return void toast.error('Espera a que se cargue tu estudio')
+    if (!asignaturaId) return void toast.error('Elige una asignatura')
+    if (!hora) return void toast.error('Indica la hora')
+    if (!dias.length) return void toast.error('Marca al menos un día')
 
-    if (!userId) return
-
-    const payload = {
-      user_id: userId,
-      estudio_id: estudioId,
-      asignatura_id: asignaturaId,
-      tipo,
-      hora,
-      dias,
-    }
-
+    setGuardando(true)
     try {
-      if (horario?.id) {
-        await updateDoc(doc(db, 'horario', horario.id), payload)
+      // Guardamos los días en orden de la semana.
+      const datos = { asignatura_id: asignaturaId, tipo, hora, dias: DIAS_SEMANA.filter((d) => dias.includes(d)) }
+      if (horario) {
+        await updateDoc(doc(db, 'horario', horario.id), datos)
+        toast.success('Clase actualizada')
       } else {
-        await addDoc(collection(db, 'horario'), payload)
+        await addDoc(collection(db, 'horario'), { ...datos, user_id: userId, estudio_id: estudioId })
+        toast.success('Clase añadida')
       }
-
-      toast.success(horario?.id ? 'Horario actualizado' : 'Horario creado', {
-        style: { background: '#1a1a1a', color: '#fff' },
-      })
-      onSuccess()
       onClose()
     } catch (err) {
-      toast.error('Error al guardar', {
-        style: { background: '#1a1a1a', color: '#fff' },
-      })
+      notifyError(err, 'No se pudo guardar la clase')
+    } finally {
+      setGuardando(false)
     }
   }
 
-  if (!visible) return null
+  const eliminar = async () => {
+    if (!horario) return
+    if (!(await confirmar({ title: '¿Eliminar esta clase?', text: 'Se quitará de todos los días del horario.' }))) return
+    try {
+      await deleteDoc(doc(db, 'horario', horario.id))
+      toast.success('Clase eliminada')
+      onClose()
+    } catch (err) {
+      notifyError(err, 'No se pudo eliminar la clase')
+    }
+  }
 
   return (
-    <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className="modal-dialog modal-dialog-centered">
-        <div className="modal-content bg-dark text-white">
-          <div className="modal-body">
-            <h4 className="text-center mb-3">
-              {horario ? 'Editar horario' : 'Nuevo horario'}
-            </h4>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={horario ? 'Editar clase' : 'Nueva clase'}
+      accent={asignaturasMap.get(asignaturaId)?.color}
+      onSubmit={guardar}
+      footer={
+        <>
+          {horario && <button type="button" className="btn btn--danger-soft sheet__footer-start" onClick={eliminar}>Eliminar</button>}
+          <button type="button" className="btn btn--ghost" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn btn--primary" disabled={guardando}>
+            {horario ? 'Guardar' : 'Añadir'}
+          </button>
+        </>
+      }
+    >
+      <Field label="Asignatura">
+        <SelectAsignatura value={asignaturaId} onChange={setAsignaturaId} />
+      </Field>
 
-            <div className="mb-3">
-              <label className="form-label">Asignatura</label>
-              <select
-                className="form-select"
-                value={asignaturaId}
-                onChange={(e) => setAsignaturaId(e.target.value)}
-              >
-                <option value="">Selecciona una asignatura</option>
-                {Object.entries(asignaturasPorCurso).map(([curso, lista]) => (
-                  <optgroup key={curso} label={`${curso}º curso`}>
-                    {lista.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.nombre}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label">Tipo de clase</label>
-              <select
-                className="form-select"
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value as 'teórica' | 'laboratorio')}
-              >
-                <option value="teórica">Teórica</option>
-                <option value="laboratorio">Laboratorio</option>
-              </select>
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label">Hora</label>
-              <input
-                type="time"
-                className="form-control"
-                value={hora}
-                onChange={(e) => setHora(e.target.value)}
-              />
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label">Días</label>
-              <div className="d-flex gap-2 flex-wrap">
-                {diasSemana.map((dia) => {
-                  const abrev = dia.slice(0, 3).toUpperCase()
-                  const activo = dias.includes(dia)
-                  return (
-                    <button
-                      key={dia}
-                      type="button"
-                      onClick={() => toggleDia(dia)}
-                      className={`btn btn-sm rounded-circle d-flex justify-content-center align-items-center ${
-                        activo ? 'btn-primary' : 'btn-outline-secondary'
-                      }`}
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        fontWeight: 'bold',
-                        padding: 0,
-                      }}
-                    >
-                      {abrev}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="d-flex justify-content-center gap-2 mt-4">
-              <button className="btn btn-primary w-100" onClick={guardar}>
-                {horario ? 'Guardar cambios' : 'Crear horario'}
+      <div className="field-row">
+        <Field label="Tipo">
+          <div className="segmented segmented--full">
+            {TIPOS.map((t) => (
+              <button key={t.value} type="button" className={tipo === t.value ? 'is-active' : ''} onClick={() => setTipo(t.value)} aria-pressed={tipo === t.value}>
+                {t.label}
               </button>
-              <button className="btn btn-secondary" onClick={onClose}>
-                Cancelar
-              </button>
-            </div>
+            ))}
           </div>
-        </div>
+        </Field>
+        <Field label="Hora de inicio">
+          <input type="time" className="input" value={hora} onChange={(e) => setHora(e.target.value)} />
+        </Field>
       </div>
-    </div>
+
+      <Field label="Días">
+        <div className="day-picker">
+          {DIAS_SEMANA.map((dia) => (
+            <button key={dia} type="button" className={dias.includes(dia) ? 'is-active' : ''} onClick={() => toggleDia(dia)} aria-pressed={dias.includes(dia)} aria-label={dia}>
+              {dia === 'miércoles' ? 'X' : dia.charAt(0).toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </Field>
+    </Modal>
   )
 }

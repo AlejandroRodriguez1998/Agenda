@@ -1,176 +1,107 @@
-// components/UserModal.tsx
-import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { auth } from '@/lib/firebaseClient'
-import Swal from 'sweetalert2'
+import { useState } from 'react'
+import { useRouter } from 'next/router'
 import toast from 'react-hot-toast'
-import { faCog } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faMoon, faRightFromBracket, faSun } from '@fortawesome/free-solid-svg-icons'
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth'
+import Modal, { Field } from './Modal'
 import EstudioSelector from './EstudioSelector'
-import {
-  deleteUser,
-  onAuthStateChanged,
-  signOut,
-  updatePassword,
-  type User,
-} from 'firebase/auth'
+import { cerrarSesion, nombreVisible, useAuth } from '@/lib/auth'
+import { useTheme } from '@/lib/theme'
 
-export default function ModalUsuario() {
-  const [visible, setVisible] = useState(false)
-  const [newPassword, setNewPassword] = useState('')
-  const [user, setUser] = useState<User | null>(null)
+export const iniciales = (nombre?: string | null, email?: string | null) =>
+  (nombre || email?.split('@')[0] || '?').slice(0, 2).toUpperCase()
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser)
-    })
-
-    return () => unsubscribe()
-  }, [])
-
-  const cerrarSesion = async () => {
-    await signOut(auth)
-    localStorage.setItem('showLogoutToast', 'true')
-    window.location.href = '/'
-  }
-
-  const borrarCuenta = async () => {
-    const confirmar = await Swal.fire({
-      title: '¿Estás seguro?',
-      text: 'Esta acción eliminará tu cuenta permanentemente',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
-    })
-
-    if (confirmar.isConfirmed) {
-      if (!user) {
-        return toast.error('No hay sesión activa', {
-          style: {
-            background: '#1a1a1a',
-            color: '#fff',
-          },
-        })
-      }
-
-      try {
-        await deleteUser(user)
-        toast.success('Cuenta eliminada', {
-          style: {
-            background: '#1a1a1a',
-            color: '#fff',
-          },
-        })
-        window.location.href = '/'
-      } catch (err) {
-        const firebaseError = err as { code?: string; message?: string }
-        const mensaje =
-          firebaseError.code === 'auth/requires-recent-login'
-            ? 'Vuelve a iniciar sesión para eliminar tu cuenta'
-            : firebaseError.message || 'No se pudo eliminar la cuenta'
-        toast.error(mensaje, {
-          style: {
-            background: '#1a1a1a',
-            color: '#fff',
-          },
-        })
-      }
-    }
-  }
+export default function ModalUsuario({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter()
+  const { user } = useAuth()
+  const { theme, setTheme } = useTheme()
+  const [actual, setActual] = useState('')
+  const [nueva, setNueva] = useState('')
+  const [guardando, setGuardando] = useState(false)
 
   const cambiarContrasena = async () => {
-    if (!newPassword || newPassword.length < 6) {
-      return toast.error('La contrasena debe tener al menos 6 caracteres', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-    }
+    if (!user?.email) return
+    if (nueva.length < 6) return toast.error('La contraseña debe tener al menos 6 caracteres')
+    if (!actual) return toast.error('Introduce tu contraseña actual')
 
-    if (!user) {
-      return toast.error('No hay sesión activa', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
-    }
-
+    setGuardando(true)
     try {
-      await updatePassword(user, newPassword)
-      toast.success('Contrasena actualizada', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
+      await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, actual))
+      await updatePassword(user, nueva)
+      toast.success('Contraseña actualizada')
+      setActual('')
+      setNueva('')
     } catch (err) {
-      const firebaseError = err as { message?: string }
-      toast.error(firebaseError.message || 'No se pudo actualizar la contrasena', {
-        style: {
-          background: '#1a1a1a',
-          color: '#fff',
-        },
-      })
+      const code = (err as { code?: string }).code
+      toast.error(
+        code === 'auth/invalid-credential' || code === 'auth/wrong-password'
+          ? 'La contraseña actual no es correcta'
+          : code === 'auth/too-many-requests'
+            ? 'Demasiados intentos. Inténtalo más tarde'
+            : 'No se pudo actualizar la contraseña'
+      )
+    } finally {
+      setGuardando(false)
     }
   }
 
-  const handleClose = () => setVisible(false)
-  const modal = (
-    <div
-      className="modal fade show d-block app-modal-layer"
-      tabIndex={-1}
-      onClick={handleClose}
-    >
-      <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-content bg-dark text-white">
-          <div className="modal-body">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5 className="modal-title mb-0">Usuario</h5>
-              <button className="btn btn-outline-light" onClick={handleClose} aria-label="Cerrar">
-                ×
-              </button>
-            </div>
-
-            <h4 className="text-white text-center my-4">
-              <strong> {user?.email ?? ''}</strong>
-            </h4>
-
-            <label className="form-label">Mis estudios</label>
-            <div className="mb-4">
-              <EstudioSelector />
-            </div>
-
-            <label className="form-label">Nueva contrasena</label>
-            <input
-              type="password"
-              className="form-control mb-3"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="********"
-            />
-
-            <button className="btn btn-primary w-100 mb-2" onClick={cambiarContrasena}>
-              Cambiar contrasena
-            </button>
-            <button className="btn btn-secondary w-100" onClick={cerrarSesion}>
-              Cerrar sesión
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  const salir = async () => {
+    onClose()
+    await cerrarSesion()
+    router.replace('/')
+  }
 
   return (
-    <>
-      <button className="btn btn-link text-white p-0" onClick={() => setVisible(true)}>
-        <FontAwesomeIcon icon={faCog} size="lg" />
-      </button>
+    <Modal open={open} onClose={onClose} title="Ajustes">
+      <div className="profile-card">
+        <span className="avatar avatar--lg">{iniciales(user?.displayName, user?.email)}</span>
+        <div>
+          <strong>{nombreVisible(user)}</strong>
+          <span>{user?.email}</span>
+        </div>
+      </div>
 
-      {visible && createPortal(modal, document.body)}
-    </>
+      <section className="settings-group">
+        <h3>Mis estudios</h3>
+        <EstudioSelector />
+      </section>
+
+      <section className="settings-group">
+        <h3>Apariencia</h3>
+        <div className="segmented segmented--full" role="radiogroup" aria-label="Tema">
+          <button type="button" role="radio" aria-checked={theme === 'light'} className={theme === 'light' ? 'is-active' : ''} onClick={() => setTheme('light')}>
+            <FontAwesomeIcon icon={faSun} /> Claro
+          </button>
+          <button type="button" role="radio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'is-active' : ''} onClick={() => setTheme('dark')}>
+            <FontAwesomeIcon icon={faMoon} /> Oscuro
+          </button>
+        </div>
+      </section>
+
+      <form
+        className="settings-group"
+        onSubmit={(event) => {
+          event.preventDefault()
+          cambiarContrasena()
+        }}
+      >
+        <h3>Cambiar contraseña</h3>
+        <input type="email" autoComplete="username" value={user?.email ?? ''} readOnly hidden />
+        <Field label="Contraseña actual">
+          <input className="input" type="password" autoComplete="current-password" value={actual} onChange={(e) => setActual(e.target.value)} />
+        </Field>
+        <Field label="Nueva contraseña" hint="Mínimo 6 caracteres">
+          <input className="input" type="password" autoComplete="new-password" value={nueva} onChange={(e) => setNueva(e.target.value)} />
+        </Field>
+        <button type="submit" className="btn btn--secondary btn--block" disabled={guardando || !actual || !nueva}>
+          {guardando ? 'Guardando…' : 'Actualizar contraseña'}
+        </button>
+      </form>
+
+      <button type="button" className="btn btn--danger-soft btn--block" onClick={salir}>
+        <FontAwesomeIcon icon={faRightFromBracket} /> Cerrar sesión
+      </button>
+    </Modal>
   )
 }

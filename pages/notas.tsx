@@ -1,382 +1,219 @@
-// pages/notas.tsx
-
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/router'
-import { auth, db } from '@/lib/firebaseClient'
-import AppShell from '@/components/AppShell'
-import { useEstudio } from '@/components/EstudioContext'
-import ModalNota from '@/components/ModalNota'
-import Swal from 'sweetalert2'
+import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import Head from 'next/head'
-import { faChartLine, faGraduationCap, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  orderBy,
-  query,
-  where,
-} from 'firebase/firestore'
-import { onAuthStateChanged } from 'firebase/auth'
+import { faChartColumn, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { deleteDoc, doc } from 'firebase/firestore'
+import AppShell, { EmptyState, Skeleton } from '@/components/AppShell'
+import Modal from '@/components/Modal'
+import ModalNota from '@/components/ModalNota'
+import { useAuth } from '@/lib/auth'
+import { useData } from '@/lib/data'
+import { db } from '@/lib/firebaseClient'
+import { calcularNotaFinal, formatNota, gradeTone, mediaEvaluada, pesoEvaluado } from '@/lib/grades'
+import type { Asignatura, Nota } from '@/lib/types'
+import { confirmar, notifyError } from '@/lib/ui'
 
-type Asignatura = {
-  id: string
-  nombre: string
-  color: string
-  curso: number
-  estudio_id?: string
-}
-
-type Nota = {
-  id: string
-  tipo: string
-  nota: number
-  peso: number
-  created_at: string
-  asignatura_id: string
-}
+const COLORES_CURSO = ['#ff4d4f', '#fadb14', '#52c41a', '#1677ff', '#a855f7', '#ec4899']
+const colorCurso = (index: number) => COLORES_CURSO[index % COLORES_CURSO.length]
+const GAUGE = { cx: 110, cy: 118, radio: 56, grosor: 10, hueco: 6 }
 
 export default function NotasPage() {
-  const router = useRouter()
-  const { estudioId, esDelEstudioActivo } = useEstudio()
-  const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
+  const { user } = useAuth()
+  const { asignaturas, asignaturasMap, notas, cargando } = useData()
   const [seleccionada, setSeleccionada] = useState<string | null>(null)
-  const [notas, setNotas] = useState<Nota[]>([])
-  const [notasPorAsignatura, setNotasPorAsignatura] = useState<Record<string, Nota[]>>({})
-  const [cargando, setCargando] = useState(true)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [notaModal, setNotaModal] = useState<{ open: boolean; nota: Nota | null }>({ open: false, nota: null })
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/login')
-      } else {
-        setUserId(user.uid)
-      }
-    })
+  const notasDe = (id: string) => notas.filter((n) => n.asignatura_id === id)
+  const evaluadas = asignaturas
+    .map((asignatura) => ({ asignatura, notas: notasDe(asignatura.id) }))
+    .filter((item) => item.notas.length)
+    .map((item) => ({ ...item, final: calcularNotaFinal(item.notas) }))
+  const mediaGlobal = evaluadas.length ? evaluadas.reduce((acc, item) => acc + item.final, 0) / evaluadas.length : null
 
-    return () => unsubscribe()
-  }, [router])
-
-  useEffect(() => {
-    if (userId && estudioId) {
-      setSeleccionada(null)
-      setNotas([])
-      cargarAsignaturasYNotas(userId)
-    }
-  }, [userId, estudioId])
-
-  const cargarAsignaturasYNotas = async (uid: string) => {
-    setCargando(true)
-    setError(null)
-
-    try {
-      const asignaturasSnapshot = await getDocs(
-        query(
-          collection(db, 'asignaturas'),
-          where('user_id', '==', uid),
-          orderBy('curso', 'asc'),
-          orderBy('nombre', 'asc')
-        )
-      )
-      const asignaturasData = asignaturasSnapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<Asignatura, 'id'>),
-      })).filter(esDelEstudioActivo)
-
-      const notasSnapshot = await getDocs(
-        query(
-          collection(db, 'notas_academicas'),
-          where('user_id', '==', uid),
-          orderBy('created_at', 'asc')
-        )
-      )
-      const notasData = notasSnapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<Nota, 'id'>),
-      }))
-
-      setAsignaturas(asignaturasData)
-
-      const agrupadas = asignaturasData.reduce((acc, asignatura) => {
-        acc[asignatura.id] = notasData.filter(n => n.asignatura_id === asignatura.id)
-        return acc
-      }, {} as Record<string, Nota[]>)
-
-      setNotasPorAsignatura(agrupadas)
-
-      if (seleccionada) {
-        setNotas(agrupadas[seleccionada] || [])
-      }
-    } catch (err) {
-      const firebaseError = err as { message?: string }
-      setError(firebaseError.message || 'No se pudieron cargar las notas.')
-    } finally {
-      setCargando(false)
-    }
-  }
-
-  const eliminarNota = async (id: string) => {
-    const confirmar = await Swal.fire({
-      title: '¿Estás seguro?',
-      text: 'Esta acción no se puede deshacer',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
-    })
-
-    if (confirmar.isConfirmed) {
-      try {
-        await deleteDoc(doc(db, 'notas_academicas', id))
-        if (userId) await cargarAsignaturasYNotas(userId)
-      } catch (err) {
-        toast.error('No se pudo eliminar la nota')
-      }
-    }
-  }
-
-  const calcularNotaFinal = (notas: Nota[]) => {
-    const pesoTotal = notas.reduce((acc, n) => acc + n.peso, 0)
-    if (pesoTotal === 0) return 0
-    return notas.reduce((acc, n) => acc + n.nota * (n.peso / 100), 0)
-  }
-
-  const notasFinales = asignaturas.map((a) => {
-    const notas = notasPorAsignatura[a.id] || []
-    return {
-      asignatura: a,
-      final: calcularNotaFinal(notas),
-    }
-  }).filter(n => n.final > 0)
-
-  const notasPorCurso = notasFinales.reduce((acc, nota) => {
-    const curso = nota.asignatura.curso
-    if (!acc[curso]) acc[curso] = []
-    acc[curso].push(nota)
+  const porCurso = asignaturas.reduce((acc, asignatura) => {
+    const key = asignatura.curso ?? 0
+    ;(acc[key] ||= []).push(asignatura)
     return acc
-  }, {} as Record<string, { asignatura: Asignatura; final: number }[]>)
+  }, {} as Record<number, Asignatura[]>)
+  const cursos = Object.keys(porCurso).map(Number).sort((a, b) => (a || 99) - (b || 99))
 
-  const mediaGlobal =
-    notasFinales.length > 0
-      ? (notasFinales.reduce((acc, n) => acc + n.final, 0) / notasFinales.length).toFixed(2)
-      : null
+  // Arcoíris: un arco por curso (mínimo 1º a 4º), igual que el gráfico original.
+  const cursosArcoiris = Array.from({ length: Math.max(4, ...cursos) }, (_, i) => i + 1)
 
-  const cursos = [1, 2, 3, 4]
-  const progresoPorCurso = cursos.map((curso) => {
-    const asignaturasCurso = asignaturas.filter((a) => a.curso === curso)
-    const total = asignaturasCurso.length
-    const conNota = asignaturasCurso.filter((a) => (notasPorAsignatura[a.id] || []).length > 0).length
+  const resumenCurso = (curso: number) => {
+    const items = evaluadas.filter((item) => (item.asignatura.curso ?? 0) === curso)
     return {
-      curso,
-      total,
-      conNota,
-      progreso: total > 0 ? conNota / total : 0,
+      total: porCurso[curso]?.length ?? 0,
+      evaluadas: items.length,
+      media: items.length ? items.reduce((acc, item) => acc + item.final, 0) / items.length : null,
     }
-  })
-
-  const asignaturaSeleccionada = seleccionada
-    ? asignaturas.find((asignatura) => asignatura.id === seleccionada)
-    : null
-
-  const abrirDetalleAsignatura = (asignaturaId: string) => {
-    setSeleccionada(asignaturaId)
-    setNotas(notasPorAsignatura[asignaturaId] || [])
   }
 
-  const cerrarDetalleAsignatura = () => {
-    setSeleccionada(null)
-    setNotas([])
-    setModalVisible(false)
+  const asignatura = seleccionada ? asignaturasMap.get(seleccionada) : undefined
+  const notasSeleccionada = seleccionada ? notasDe(seleccionada) : []
+  const pesoSeleccionada = pesoEvaluado(notasSeleccionada)
+
+  const eliminarNota = async (nota: Nota) => {
+    if (!(await confirmar({ title: '¿Eliminar nota?', text: `${nota.tipo}: ${nota.nota}` }))) return
+    try {
+      await deleteDoc(doc(db, 'notas_academicas', nota.id))
+      toast.success('Nota eliminada')
+    } catch (err) {
+      notifyError(err, 'No se pudo eliminar la nota')
+    }
   }
 
   return (
-    <>
-      <Head>
-        <title>Notas</title>
-      </Head>
-      <AppShell title="Notas" eyebrow="Rendimiento" showAdd={false}>
-      <main className="academic-page">
-        <section className="metric-grid">
-          <article className="metric-card">
-            <FontAwesomeIcon icon={faChartLine} />
-            <div><strong>{mediaGlobal || '-'}</strong><span>Media global</span></div>
-          </article>
-          <article className="metric-card">
-            <FontAwesomeIcon icon={faGraduationCap} />
-            <div><strong>{notasFinales.length}</strong><span>Asignaturas evaluadas</span></div>
-          </article>
-        </section>
-
-        {error && <div className="error-panel"><strong>No se pudieron cargar las notas</strong><p>{error}</p></div>}
-        {cargando ? (
-          <div className="app-state">Cargando notas...</div>
-        ) : (
-          <>
-            {mediaGlobal ? (
-              <section className="page-card grade-summary">
-                <div className="grade-gauge">
-                  <svg width="220" height="140" viewBox="0 0 220 140" style={{ display: 'block', margin: '0 auto' }}>
-                    {(() => {
-                      const cx = 110
-                      const cy = 120
-                      const stroke = 10
-                      const gap = 6
-                      const baseRadius = 56
-                      const colors = ['#ff4d4f', '#fadb14', '#52c41a', '#1677ff']
-                      const half = Math.PI
-                      return progresoPorCurso.map((item, i) => {
-                        const orderIndex = (progresoPorCurso.length - 1) - i
-                        const r = baseRadius + orderIndex * (stroke + gap)
-                        const circumference = 2 * Math.PI * r
-                        const halfCirc = circumference * 0.5
-                        const dashProgress = `${halfCirc * item.progreso} ${circumference}`
-                        return (
-                          <g key={item.curso}>
-                            <circle
-                              cx={cx}
-                              cy={cy}
-                              r={r}
-                              fill="none"
-                              stroke="rgba(255,255,255,0.12)"
-                              strokeWidth={stroke}
-                              strokeDasharray={`${halfCirc} ${circumference}`}
-                              transform={`rotate(180 ${cx} ${cy})`}
-                            />
-                            <circle
-                              cx={cx}
-                              cy={cy}
-                              r={r}
-                              fill="none"
-                              stroke={colors[i]}
-                              strokeWidth={stroke}
-                              strokeLinecap="round"
-                              strokeDasharray={dashProgress}
-                              transform={`rotate(180 ${cx} ${cy})`}
-                              style={{ filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.35))' }}
-                            />
-                          </g>
-                        )
-                      })
-                    })()}
-                  </svg>
-                  <div>
-                    {mediaGlobal}
-                  </div>
-                </div>
-                <h2>Media global de todas las asignaturas</h2>
-                <div className="course-legend">
-                  {progresoPorCurso.map((item, idx) => (
-                    <div key={item.curso}>
-                      <span style={{ color: ['#ff4d4f', '#fadb14', '#52c41a', '#1677ff'][idx] }}>●</span>{' '}
-                      {item.curso}º: {item.conNota}/{item.total}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ) : (
-              <div className="empty-panel">No hay notas aún.</div>
-            )}
-
-            <section className="stack-list">
-              {Object.entries(notasPorCurso)
-              .sort((a, b) => Number(a[0]) - Number(b[0]))
-              .map(([curso, lista]) => (
-                <article key={curso} className="page-card">
-                  <div className="card-heading">
-                    <div>
-                      <span className="soft-icon"><FontAwesomeIcon icon={faGraduationCap} /></span>
-                      <h2>{curso}º curso</h2>
-                    </div>
-                    <span>{lista.length} medias</span>
-                  </div>
-                  <div className="grade-course-list">
-                  {lista.map(({ asignatura, final }) => (
-                    <button
-                      key={asignatura.id}
-                      className="grade-course-row"
-                      style={{ '--item-color': asignatura.color || '#6c8cff' } as React.CSSProperties}
-                      onClick={() => abrirDetalleAsignatura(asignatura.id)}
-                    >
-                      <span className="color-dot" />
-                      <strong>{asignatura.nombre}</strong>
-                      <b>{final.toFixed(2)}</b>
-                    </button>
-                  ))}
-                  </div>
-                </article>
-              ))}
-            </section>
-          </>
-        )}
-
-        {asignaturaSeleccionada && !modalVisible && (
-          <div className="grade-modal-backdrop" onClick={cerrarDetalleAsignatura}>
-            <section
-              className="grade-modal"
-              style={{ '--item-color': asignaturaSeleccionada.color || '#6c8cff' } as React.CSSProperties}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="grade-modal__header">
-                <div className="grade-detail-head">
-                  <div className="grade-score">
-                    {notas.length ? calcularNotaFinal(notas).toFixed(2) : '-'}
-                  </div>
-                  <div>
-                    <h2>{asignaturaSeleccionada.nombre}</h2>
-                    <p>Total ponderado registrado: {notas.reduce((acc, n) => acc + n.peso, 0)}%</p>
-                  </div>
-                </div>
-                <button onClick={cerrarDetalleAsignatura} aria-label="Cerrar">×</button>
+    <AppShell title="Notas" subtitle={evaluadas.length ? `${evaluadas.length} de ${asignaturas.length} asignaturas evaluadas` : 'Calificaciones y medias'}>
+      {cargando ? (
+        <Skeleton />
+      ) : !asignaturas.length ? (
+        <EmptyState icon={faChartColumn} title="Sin asignaturas" text="Crea tus asignaturas para empezar a registrar notas." />
+      ) : (
+        <div className="stack">
+          <section className="card grades-hero">
+            <div className="grades-hero__main">
+              <div className="grade-gauge">
+                <svg viewBox="0 0 220 128" role="img" aria-label="Progreso de evaluación por curso">
+                  {cursosArcoiris.map((curso, i) => {
+                    const { total, evaluadas: conNota } = resumenCurso(curso)
+                    const progreso = total ? conNota / total : 0
+                    // El 1º curso es el arco exterior, como en la versión original.
+                    const r = GAUGE.radio + (cursosArcoiris.length - 1 - i) * (GAUGE.grosor + GAUGE.hueco)
+                    const mitad = Math.PI * r
+                    const props = {
+                      cx: GAUGE.cx,
+                      cy: GAUGE.cy,
+                      r,
+                      fill: 'none',
+                      strokeWidth: GAUGE.grosor,
+                      transform: `rotate(180 ${GAUGE.cx} ${GAUGE.cy})`,
+                    }
+                    return (
+                      <g key={curso}>
+                        <circle {...props} className="grade-gauge__track" strokeDasharray={`${mitad} ${2 * mitad}`} />
+                        {progreso > 0 && (
+                          <circle {...props} stroke={colorCurso(i)} strokeLinecap="round" strokeDasharray={`${mitad * progreso} ${2 * mitad}`} />
+                        )}
+                      </g>
+                    )
+                  })}
+                </svg>
+                <strong className={mediaGlobal !== null ? gradeTone(mediaGlobal) : undefined}>
+                  {mediaGlobal !== null ? formatNota(mediaGlobal) : '—'}
+                </strong>
               </div>
+              <small className="muted">{evaluadas.length ? 'Media global de todas las asignaturas' : 'Toca una asignatura para añadir su primera nota'}</small>
+            </div>
+            <ul className="course-bars">
+              {cursosArcoiris.map((curso) => {
+                const r = resumenCurso(curso)
+                return (
+                  <li key={curso}>
+                    <span><i className="dot" style={{ background: colorCurso(cursosArcoiris.indexOf(curso)) }} /> {curso}º</span>
+                    <span className="bar"><i style={{ width: `${r.media !== null ? r.media * 10 : 0}%` }} className={r.media !== null ? gradeTone(r.media) : ''} /></span>
+                    <b>{r.media !== null ? formatNota(r.media) : '—'}</b>
+                    <small className="muted">{r.evaluadas}/{r.total}</small>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
 
-              {notas.length === 0 ? (
-                <div className="empty-panel">No hay notas aún.</div>
-              ) : (
-                <div className="grade-list">
-                  {notas.map((n) => (
-                    <div key={n.id} className="grade-row">
-                      <div>
-                        <strong>{n.tipo}</strong>
-                        <span>Peso: {n.peso}%</span>
-                      </div>
-                      <div className="row-actions">
-                        <b>{n.nota}</b>
-                        <button onClick={() => eliminarNota(n.id)} aria-label="Eliminar nota">
-                          <FontAwesomeIcon icon={faTrash} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <button className="grade-modal__add" onClick={() => setModalVisible(true)}>
-                <FontAwesomeIcon icon={faPlus} />
-                Añadir nota
-              </button>
+          {cursos.map((curso) => (
+            <section key={curso} className="card">
+              <div className="card__head">
+                <h2>{curso ? `${curso}º curso` : 'Sin curso'}</h2>
+                <span className="muted">{resumenCurso(curso).evaluadas}/{porCurso[curso].length} evaluadas</span>
+              </div>
+              <ul className="grade-list">
+                {porCurso[curso].map((a) => {
+                  const lista = notasDe(a.id)
+                  const final = lista.length ? calcularNotaFinal(lista) : null
+                  const peso = pesoEvaluado(lista)
+                  const media = mediaEvaluada(lista)
+                  return (
+                    <li key={a.id}>
+                      <button type="button" className="grade-row" style={{ '--item': asignaturasMap.get(a.id)?.color } as React.CSSProperties} onClick={() => setSeleccionada(a.id)}>
+                        <i className="dot" />
+                        <span className="grade-row__body">
+                          <strong>{a.nombre}</strong>
+                          <span className="progress" aria-label={`${peso}% evaluado`}><i style={{ width: `${Math.min(100, peso)}%` }} /></span>
+                          <small className="muted">
+                            {lista.length
+                              ? `${peso}% evaluado${peso > 0 && peso < 100 ? ` · media ${formatNota(media)}` : ''}`
+                              : 'Sin notas'}
+                          </small>
+                        </span>
+                        <span className={`grade ${final !== null ? gradeTone(media) : 'grade--empty'}`}>{final !== null ? formatNota(final) : '—'}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
             </section>
-          </div>
-        )}
+          ))}
+        </div>
+      )}
 
-        {userId && seleccionada && (
-          <ModalNota
-            visible={modalVisible}
-            asignaturaId={seleccionada}
-            onClose={() => setModalVisible(false)}
-            onSuccess={() => userId && cargarAsignaturasYNotas(userId)}
-            userId={userId}
-          />
+      <Modal
+        open={!!asignatura && !notaModal.open}
+        onClose={() => setSeleccionada(null)}
+        title={asignatura?.nombre ?? ''}
+        subtitle={
+          pesoSeleccionada > 100
+            ? `${pesoSeleccionada}% evaluado · los pesos superan el 100%`
+            : pesoSeleccionada > 0 && pesoSeleccionada < 100
+              ? `${pesoSeleccionada}% evaluado · media sobre lo evaluado ${formatNota(mediaEvaluada(notasSeleccionada))}`
+              : `${pesoSeleccionada}% evaluado`
+        }
+        accent={asignatura?.color}
+        footer={
+          <button type="button" className="btn btn--primary btn--block" onClick={() => setNotaModal({ open: true, nota: null })}>
+            <FontAwesomeIcon icon={faPlus} /> Añadir nota
+          </button>
+        }
+      >
+        <div className="grade-detail">
+          <span className={`grade grade--xl ${notasSeleccionada.length ? gradeTone(mediaEvaluada(notasSeleccionada)) : 'grade--empty'}`}>
+            {notasSeleccionada.length ? formatNota(calcularNotaFinal(notasSeleccionada)) : '—'}
+          </span>
+          <span className="progress progress--lg"><i style={{ width: `${Math.min(100, pesoSeleccionada)}%` }} /></span>
+        </div>
+        {notasSeleccionada.length ? (
+          <ul className="note-list">
+            {notasSeleccionada.map((nota) => (
+              <li key={nota.id}>
+                <span className="note-list__body">
+                  <strong>{nota.tipo}</strong>
+                  <small className="muted">Peso {nota.peso}% · aporta {formatNota((Number(nota.nota) || 0) * (Number(nota.peso) || 0) / 100)}</small>
+                </span>
+                <b className={gradeTone(Number(nota.nota))}>{nota.nota}</b>
+                <button type="button" className="icon-btn icon-btn--sm" onClick={() => setNotaModal({ open: true, nota })} aria-label={`Editar ${nota.tipo}`}>
+                  <FontAwesomeIcon icon={faPen} />
+                </button>
+                <button type="button" className="icon-btn icon-btn--sm icon-btn--danger" onClick={() => eliminarNota(nota)} aria-label={`Eliminar ${nota.tipo}`}>
+                  <FontAwesomeIcon icon={faTrash} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted pad">Aún no hay notas en esta asignatura.</p>
         )}
-      </main>
-      </AppShell>
-    </>
+      </Modal>
+
+      {user && seleccionada && (
+        <ModalNota
+          open={notaModal.open}
+          nota={notaModal.nota}
+          asignaturaId={seleccionada}
+          asignaturaNombre={asignatura?.nombre}
+          pesoRestante={100 - pesoSeleccionada}
+          userId={user.uid}
+          onClose={() => setNotaModal((s) => ({ ...s, open: false }))}
+        />
+      )}
+    </AppShell>
   )
 }
