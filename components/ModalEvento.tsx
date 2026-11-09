@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { db } from '@/lib/firebaseClient'
 import toast from 'react-hot-toast'
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore'
+import { useEstudio } from './EstudioContext'
 
 type EventoEditable = {
   id?: string
@@ -26,6 +27,7 @@ export default function ModalEvento({
   fechaPorDefecto,
   evento
 }: ModalEventoProps) {
+  const { estudioId } = useEstudio()
   const [titulo, setTitulo] = useState('')
   const [color, setColor] = useState('#0d6efd')
 
@@ -69,6 +71,7 @@ export default function ModalEvento({
       try {
         await addDoc(collection(db, 'eventos'), {
           user_id: userId,
+          estudio_id: estudioId,
           title: titulo,
           start: fechaPorDefecto,
           color,

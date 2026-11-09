@@ -12,6 +12,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
+import { useEstudio } from './EstudioContext'
 
 type TareaModalProps = {
   visible: boolean
@@ -33,6 +34,7 @@ type Asignatura = {
 }
 
 export default function ModalTarea({ visible, onClose, onSuccess, tarea, userId }: TareaModalProps) {
+  const { estudioId, esDelEstudioActivo } = useEstudio()
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
   const [asignaturaId, setAsignaturaId] = useState(tarea?.asignatura_id || '')
   const [titulo, setTitulo] = useState(tarea?.titulo || '')
@@ -50,13 +52,13 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea, userId 
       const snapshot = await getDocs(q)
       const data = snapshot.docs.map((docSnap) => ({
         id: docSnap.id,
-        ...(docSnap.data() as Omit<Asignatura, 'id'>),
+        ...(docSnap.data() as Omit<Asignatura, 'id'> & { estudio_id?: string }),
       }))
-      setAsignaturas(data)
+      setAsignaturas(data.filter(esDelEstudioActivo))
     }
 
     cargarAsignaturas()
-  }, [userId])
+  }, [userId, estudioId, esDelEstudioActivo])
 
   useEffect(() => {
     if (tarea) {
@@ -95,6 +97,7 @@ export default function ModalTarea({ visible, onClose, onSuccess, tarea, userId 
       fecha_entrega: fecha || null,
       asignatura_id: asignaturaId,
       user_id: userId,
+      estudio_id: estudioId,
     }
 
     try {

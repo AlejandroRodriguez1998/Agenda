@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { auth, db } from '@/lib/firebaseClient'
 import ModalAsignatura from '@/components/ModalAsignatura'
 import AppShell from '@/components/AppShell'
+import { useEstudio } from '@/components/EstudioContext'
 import Swal from 'sweetalert2'
 import toast from 'react-hot-toast'
 import Head from 'next/head'
@@ -16,10 +17,12 @@ type Asignatura = {
   nombre: string
   color?: string
   curso: number
+  estudio_id?: string
 }
 
 export default function AsignaturasPage() {
   const router = useRouter()
+  const { estudioId, estudioActivo, esDelEstudioActivo } = useEstudio()
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
   const [cargando, setCargando] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
@@ -34,11 +37,14 @@ export default function AsignaturasPage() {
       }
 
       setUserId(user.uid)
-      await cargarAsignaturas(user.uid)
     })
 
     return () => unsubscribe()
   }, [router])
+
+  useEffect(() => {
+    if (userId && estudioId) cargarAsignaturas(userId)
+  }, [userId, estudioId])
 
   const cargarAsignaturas = async (uid: string) => {
     setCargando(true)
@@ -55,7 +61,7 @@ export default function AsignaturasPage() {
         id: docSnap.id,
         ...(docSnap.data() as Omit<Asignatura, 'id'>),
       }))
-      setAsignaturas(data)
+      setAsignaturas(data.filter(esDelEstudioActivo))
     } catch (err) {
       const firebaseError = err as { message?: string }
       setError(firebaseError.message || 'No se pudieron cargar las asignaturas.')
@@ -115,7 +121,7 @@ export default function AsignaturasPage() {
         {cargando ? (
           <div className="app-state">Cargando asignaturas...</div>
         ) : Object.keys(asignaturasPorCurso).length === 0 ? (
-          <div className="empty-panel">No tienes asignaturas.</div>
+          <div className="empty-panel">No tienes asignaturas en {estudioActivo?.nombre ?? 'este estudio'}.</div>
         ) : (
           <section className="stack-list subjects-stack">
             {Object.entries(asignaturasPorCurso).map(([curso, lista]) => (

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { db } from '@/lib/firebaseClient'
 import toast from 'react-hot-toast'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { useEstudio } from './EstudioContext'
 
 type ModalNotaProps = {
   visible: boolean
@@ -12,6 +13,7 @@ type ModalNotaProps = {
 }
 
 export default function ModalNota({ visible, asignaturaId, userId, onClose, onSuccess }: ModalNotaProps) {
+  const { estudioId } = useEstudio()
   const [tipo, setTipo] = useState('')
   const [nota, setNota] = useState('')
   const [peso, setPeso] = useState('')
@@ -40,6 +42,7 @@ export default function ModalNota({ visible, asignaturaId, userId, onClose, onSu
     try {
       await addDoc(collection(db, 'notas_academicas'), {
         user_id: userId,
+        estudio_id: estudioId,
         asignatura_id: asignaturaId,
         tipo,
         nota: parseFloat(nota),

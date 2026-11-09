@@ -6,6 +6,7 @@ import Swal from 'sweetalert2'
 import toast from 'react-hot-toast'
 import { faCog } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import EstudioSelector from './EstudioSelector'
 import {
   deleteUser,
   onAuthStateChanged,
@@ -136,6 +137,11 @@ export default function ModalUsuario() {
             <h4 className="text-white text-center my-4">
               <strong> {user?.email ?? ''}</strong>
             </h4>
+
+            <label className="form-label">Mis estudios</label>
+            <div className="mb-4">
+              <EstudioSelector />
+            </div>
 
             <label className="form-label">Nueva contrasena</label>
             <input

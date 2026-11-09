@@ -9,6 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '@/lib/firebaseClient'
 import SplashScreen from '@/components/SplashScreen'
 import { applyTheme, getStoredTheme } from '@/lib/theme'
+import { EstudioProvider } from '@/components/EstudioContext'
 
 export default function App({ Component, pageProps }: AppProps) {
   const [isClient, setIsClient] = useState(false)
@@ -32,11 +33,11 @@ export default function App({ Component, pageProps }: AppProps) {
   }
 
   return (
-    <>
+    <EstudioProvider>
       <div className="mt-5 pt-2"></div>
       <Component {...pageProps} />
       <BottomNav />
       {isClient && <Toaster position="top-center" reverseOrder={false} />}
-    </>
+    </EstudioProvider>
   )
 }

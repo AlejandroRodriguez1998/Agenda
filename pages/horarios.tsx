@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { db, auth } from '@/lib/firebaseClient'
 import { useRouter } from 'next/router'
 import AppShell from '@/components/AppShell'
+import { useEstudio } from '@/components/EstudioContext'
 import ModalHorario from '@/components/ModalHorario'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCalendarDays, faClock, faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
@@ -36,6 +37,7 @@ const diasSemana = [
 
 export default function HorariosPage() {
   const router = useRouter()
+  const { estudioId, esDelEstudioActivo } = useEstudio()
   const [usuarioVerificado, setUsuarioVerificado] = useState(false)
   const [horarios, setHorarios] = useState<Horario[]>([])
   const [cargando, setCargando] = useState(true)
@@ -55,12 +57,15 @@ export default function HorariosPage() {
       } else {
         setUserId(user.uid)
         setUsuarioVerificado(true)
-        await cargarHorarios(user.uid)
       }
     })
 
     return () => unsubscribe()
   }, [router])
+
+  useEffect(() => {
+    if (userId && estudioId) cargarHorarios(userId)
+  }, [userId, estudioId])
 
   const cargarHorarios = async (uid: string) => {
     setCargando(true)
@@ -75,10 +80,10 @@ export default function HorariosPage() {
       )
 
       const asignaturasMap = new Map(
-        asignaturasSnapshot.docs.map((docSnap) => [
-          docSnap.id,
-          { id: docSnap.id, ...(docSnap.data() as { nombre: string; color?: string }) },
-        ])
+        asignaturasSnapshot.docs
+          .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as { nombre: string; color?: string; estudio_id?: string }) }))
+          .filter(esDelEstudioActivo)
+          .map((asignatura) => [asignatura.id, asignatura])
       )
 
       const horariosData = horariosSnapshot.docs.map((docSnap) => {
@@ -94,7 +99,7 @@ export default function HorariosPage() {
         }
       })
 
-      setHorarios(horariosData)
+      setHorarios(horariosData.filter((h) => asignaturasMap.has(h.asignatura_id)))
     } catch (err) {
       const firebaseError = err as { message?: string }
       setError(firebaseError.message || 'No se pudieron cargar los horarios.')

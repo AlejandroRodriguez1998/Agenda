@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { auth, db } from '@/lib/firebaseClient'
 import AppShell from '@/components/AppShell'
+import { useEstudio } from '@/components/EstudioContext'
 import ModalNota from '@/components/ModalNota'
 import Swal from 'sweetalert2'
 import toast from 'react-hot-toast'
@@ -26,6 +27,7 @@ type Asignatura = {
   nombre: string
   color: string
   curso: number
+  estudio_id?: string
 }
 
 type Nota = {
@@ -39,6 +41,7 @@ type Nota = {
 
 export default function NotasPage() {
   const router = useRouter()
+  const { estudioId, esDelEstudioActivo } = useEstudio()
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
   const [seleccionada, setSeleccionada] = useState<string | null>(null)
   const [notas, setNotas] = useState<Nota[]>([])
@@ -54,12 +57,19 @@ export default function NotasPage() {
         router.push('/login')
       } else {
         setUserId(user.uid)
-        await cargarAsignaturasYNotas(user.uid)
       }
     })
 
     return () => unsubscribe()
   }, [router])
+
+  useEffect(() => {
+    if (userId && estudioId) {
+      setSeleccionada(null)
+      setNotas([])
+      cargarAsignaturasYNotas(userId)
+    }
+  }, [userId, estudioId])
 
   const cargarAsignaturasYNotas = async (uid: string) => {
     setCargando(true)
@@ -77,7 +87,7 @@ export default function NotasPage() {
       const asignaturasData = asignaturasSnapshot.docs.map((docSnap) => ({
         id: docSnap.id,
         ...(docSnap.data() as Omit<Asignatura, 'id'>),
-      }))
+      })).filter(esDelEstudioActivo)
 
       const notasSnapshot = await getDocs(
         query(

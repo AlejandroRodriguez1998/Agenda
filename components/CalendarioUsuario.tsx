@@ -23,6 +23,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 import ModalEvento from './ModalEvento'
 import ModalUsuario from './ModalUsuario'
+import { useEstudio } from './EstudioContext'
 import Swal from 'sweetalert2'
 import { getStoredTheme, setStoredTheme, type Theme } from '@/lib/theme'
 import {
@@ -36,10 +37,10 @@ import {
   where,
 } from 'firebase/firestore'
 
-type Evento = { id: string; title: string; start: string; color?: string }
+type Evento = { id: string; title: string; start: string; color?: string; estudio_id?: string }
 type Horario = { id: string; asignatura_id: string; tipo: string; hora: string; dias: string[] }
 type Tarea = { id: string; titulo: string; completada: boolean; created_at?: string; fecha_entrega?: string; asignatura_id: string }
-type Asignatura = { id: string; nombre: string; color?: string; curso?: number }
+type Asignatura = { id: string; nombre: string; color?: string; curso?: number; estudio_id?: string }
 
 type CalendarItem = {
   id: string
@@ -125,6 +126,7 @@ export default function CalendarioUsuario({
   onLogout?: () => void
 }) {
   const router = useRouter()
+  const { estudioId, esDelEstudioActivo } = useEstudio()
   const [eventos, setEventos] = useState<Evento[]>([])
   const [horarios, setHorarios] = useState<Horario[]>([])
   const [tareas, setTareas] = useState<Tarea[]>([])
@@ -139,8 +141,8 @@ export default function CalendarioUsuario({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    cargarDashboard()
-  }, [userId])
+    if (estudioId) cargarDashboard()
+  }, [userId, estudioId])
 
   useEffect(() => {
     setTheme(getStoredTheme())
@@ -182,10 +184,27 @@ export default function CalendarioUsuario({
         getDocs(query(collection(db, 'tareas'), where('user_id', '==', userId), orderBy('created_at', 'desc'))),
       ])
 
-      setEventos(eventosSnapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Evento, 'id'>) })))
-      setAsignaturas(asignaturasSnapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Asignatura, 'id'>) })))
-      setHorarios(horariosSnapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Horario, 'id'>) })))
-      setTareas(tareasSnapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Tarea, 'id'>) })))
+      const asignaturasEstudio = asignaturasSnapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Asignatura, 'id'>) }))
+        .filter(esDelEstudioActivo)
+      const idsAsignaturas = new Set(asignaturasEstudio.map((a) => a.id))
+
+      setEventos(
+        eventosSnapshot.docs
+          .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Evento, 'id'>) }))
+          .filter(esDelEstudioActivo)
+      )
+      setAsignaturas(asignaturasEstudio)
+      setHorarios(
+        horariosSnapshot.docs
+          .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Horario, 'id'>) }))
+          .filter((h) => idsAsignaturas.has(h.asignatura_id))
+      )
+      setTareas(
+        tareasSnapshot.docs
+          .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Tarea, 'id'>) }))
+          .filter((t) => idsAsignaturas.has(t.asignatura_id))
+      )
     } catch (err) {
       const firebaseError = err as { message?: string }
       setError(firebaseError.message || 'No se pudo cargar el dashboard.')

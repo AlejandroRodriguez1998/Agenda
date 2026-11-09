@@ -11,6 +11,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
+import { useEstudio } from './EstudioContext'
 
 type Horario = {
   id: string
@@ -37,6 +38,7 @@ type Asignatura = {
 const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
 
 export default function ModalHorario({ visible, onClose, onSuccess, horario, userId }: Props) {
+  const { estudioId, esDelEstudioActivo } = useEstudio()
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
   const [asignaturaId, setAsignaturaId] = useState('')
   const [tipo, setTipo] = useState<'teórica' | 'laboratorio'>('teórica')
@@ -55,13 +57,13 @@ export default function ModalHorario({ visible, onClose, onSuccess, horario, use
       const snapshot = await getDocs(q)
       const data = snapshot.docs.map((docSnap) => ({
         id: docSnap.id,
-        ...(docSnap.data() as Omit<Asignatura, 'id'>),
+        ...(docSnap.data() as Omit<Asignatura, 'id'> & { estudio_id?: string }),
       }))
-      setAsignaturas(data)
+      setAsignaturas(data.filter(esDelEstudioActivo))
     }
 
     cargarAsignaturas()
-  }, [userId])
+  }, [userId, estudioId, esDelEstudioActivo])
 
   useEffect(() => {
     if (horario) {
@@ -103,6 +105,7 @@ export default function ModalHorario({ visible, onClose, onSuccess, horario, use
 
     const payload = {
       user_id: userId,
+      estudio_id: estudioId,
       asignatura_id: asignaturaId,
       tipo,
       hora,

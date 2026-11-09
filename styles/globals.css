@@ -37,16 +37,17 @@ html, body {
   --page-shadow: 0 14px 36px rgba(52, 69, 112, 0.08);
 }
 
+/* Tema oscuro: grafito neutro (sin tinte azul/morado), oscuro pero no negro */
 html[data-theme='dark'] {
-  --page-bg: #0f1725;
-  --page-surface: #172235;
-  --page-surface-soft: #121c2c;
-  --page-surface-muted: #111b2b;
-  --page-text: #eef4ff;
-  --page-muted: #9cacc7;
-  --page-border: #25344c;
+  --page-bg: #101114;
+  --page-surface: #1a1c21;
+  --page-surface-soft: #141518;
+  --page-surface-muted: #16181c;
+  --page-text: #ebecef;
+  --page-muted: #9a9ea8;
+  --page-border: #272a31;
   --page-accent: #8b7cff;
-  --page-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+  --page-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
 }
 
 body:has(.academic-shell) {
@@ -54,7 +55,7 @@ body:has(.academic-shell) {
 }
 
 body:has(.academic-shell--dark) {
-  background: #0f1725;
+  background: var(--page-bg);
 }
 
 .modal-content.bg-dark {
@@ -491,15 +492,15 @@ body:has(.academic-shell--dark) {
 }
 
 .academic-shell--dark {
-  --app-bg: #0f1725;
-  --sidebar-bg: #121c2c;
-  --panel-bg: #172235;
-  --panel-soft: #111b2b;
-  --text: #eef4ff;
-  --muted: #9cacc7;
-  --border: #25344c;
-  --accent: #8b7cff;
-  --shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+  --app-bg: var(--page-bg);
+  --sidebar-bg: var(--page-surface-soft);
+  --panel-bg: var(--page-surface);
+  --panel-soft: var(--page-surface-muted);
+  --text: var(--page-text);
+  --muted: var(--page-muted);
+  --border: var(--page-border);
+  --accent: var(--page-accent);
+  --shadow: var(--page-shadow);
 }
 
 .academic-sidebar {
@@ -578,7 +579,7 @@ body:has(.academic-shell--dark) {
 
 .academic-shell--dark .academic-nav__item,
 .academic-shell--dark .academic-settings {
-  color: #b6c4da;
+  color: #aeb2bb;
 }
 
 .academic-nav__item:hover,
@@ -1924,4 +1925,140 @@ button.grade-course-row:hover {
   100% {
     transform: translateX(260%);
   }
+}
+
+/* ---------- Estudios (carrera / máster) en Ajustes ---------- */
+
+.swal2-container {
+  z-index: 6000 !important;
+}
+
+.estudio-lista {
+  border: 1px solid var(--page-border);
+  border-radius: 14px;
+  background: var(--page-surface-muted);
+  overflow: hidden;
+}
+
+.estudio-lista button {
+  border: 0;
+  background: transparent;
+  color: var(--page-text);
+}
+
+.estudio-lista__item {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--page-border);
+}
+
+.estudio-lista__item.is-active {
+  background: color-mix(in srgb, var(--page-accent) 10%, transparent);
+}
+
+.estudio-lista__item > button:first-child {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.estudio-lista__check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--page-border);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 0.7rem;
+}
+
+.estudio-lista__item.is-active .estudio-lista__check {
+  border-color: var(--page-accent);
+  background: var(--page-accent);
+}
+
+.estudio-lista__texto {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.estudio-lista__texto b {
+  overflow: hidden;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estudio-lista__texto small {
+  color: var(--page-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.estudio-lista .estudio-lista__edit {
+  width: 40px;
+  height: 40px;
+  margin-right: 4px;
+  border-radius: 10px;
+  color: var(--page-muted);
+}
+
+.estudio-lista .estudio-lista__edit:hover {
+  background: color-mix(in srgb, var(--page-accent) 14%, transparent);
+  color: var(--page-accent);
+}
+
+.estudio-lista .estudio-lista__add {
+  width: 100%;
+  padding: 11px 12px;
+  color: var(--page-accent);
+  font-weight: 750;
+  text-align: left;
+}
+
+.estudio-lista__add .svg-inline--fa {
+  margin-right: 8px;
+}
+
+.estudio-form {
+  padding: 14px;
+  border: 1px solid var(--page-border);
+  border-radius: 14px;
+  background: var(--page-surface-muted);
+}
+
+.estudio-tipos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.estudio-tipos button {
+  padding: 7px 14px;
+  border: 1px solid var(--page-border);
+  border-radius: 999px;
+  background: var(--page-surface);
+  color: var(--page-muted);
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+
+.estudio-tipos button.is-active {
+  border-color: var(--page-accent);
+  background: var(--page-accent);
+  color: #fff;
+}
+
+.modal-body .estudio-borrar {
+  color: #ef476f !important;
 }

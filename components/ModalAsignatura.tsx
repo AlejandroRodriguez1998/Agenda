@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { db } from '@/lib/firebaseClient'
 import toast from 'react-hot-toast'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { useEstudio } from './EstudioContext'
 
 type Props = {
   visible: boolean
@@ -12,6 +13,7 @@ type Props = {
 }
 
 export default function ModalAsignatura({ visible, onClose, onSuccess, userId }: Props) {
+  const { estudioId } = useEstudio()
   const [nombre, setNombre] = useState('')
   const [curso, setcurso] = useState(1)
   const [color, setColor] = useState('#007bff')
@@ -34,6 +36,7 @@ export default function ModalAsignatura({ visible, onClose, onSuccess, userId }:
         color,
         curso,
         user_id: userId,
+        estudio_id: estudioId,
         created_at: serverTimestamp(),
       })
 

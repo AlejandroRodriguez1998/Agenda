@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { auth, db } from '@/lib/firebaseClient'
 import ModalTarea from '@/components/ModalTarea'
 import AppShell from '@/components/AppShell'
+import { useEstudio } from '@/components/EstudioContext'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -38,6 +39,7 @@ type Asignatura = {
 
 export default function TareasPage() {
   const router = useRouter()
+  const { estudioId, esDelEstudioActivo } = useEstudio()
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([])
   const [cargando, setCargando] = useState(true)
   const [usuarioVerificado, setUsuarioVerificado] = useState(false)
@@ -53,12 +55,15 @@ export default function TareasPage() {
       } else {
         setUserId(user.uid)
         setUsuarioVerificado(true)
-        await cargarAsignaturasYtareas(user.uid)
       }
     })
 
     return () => unsubscribe()
   }, [router])
+
+  useEffect(() => {
+    if (userId && estudioId) cargarAsignaturasYtareas(userId)
+  }, [userId, estudioId])
 
   const cargarAsignaturasYtareas = async (uid: string) => {
     setCargando(true)
@@ -73,8 +78,8 @@ export default function TareasPage() {
       const asignaturasSnapshot = await getDocs(asignaturasQuery)
       const asignaturasData = asignaturasSnapshot.docs.map((docSnap) => ({
         id: docSnap.id,
-        ...(docSnap.data() as Omit<Asignatura, 'id' | 'tareas'>),
-      }))
+        ...(docSnap.data() as Omit<Asignatura, 'id' | 'tareas'> & { estudio_id?: string }),
+      })).filter(esDelEstudioActivo)
 
       const tareasQuery = query(
         collection(db, 'tareas'),
