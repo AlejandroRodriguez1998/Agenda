@@ -13,12 +13,37 @@ const AuthContext = createContext<AuthState>({ user: null, ready: false })
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, ready: false })
 
-  useEffect(() => onAuthStateChanged(auth, (user) => setState({ user, ready: true })), [])
+  useEffect(
+    () =>
+      onAuthStateChanged(auth, (user) => {
+        recordarSesion(!!user)
+        setState({ user, ready: true })
+      }),
+    []
+  )
 
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => useContext(AuthContext)
+
+/**
+ * Pista de sesión: si el usuario tenía la sesión iniciada, `<html data-session="1">`
+ * se marca antes del primer pintado (ver sessionHintScript en _document). Así el splash
+ * solo aparece cuando hay sesión y, sin ella, la landing se ve al instante.
+ */
+const SESSION_HINT_KEY = 'agenda-session'
+
+export const sessionHintScript = `(function(){try{if(localStorage.getItem('${SESSION_HINT_KEY}')==='1')document.documentElement.dataset.session='1'}catch(e){}})()`
+
+const recordarSesion = (activa: boolean) => {
+  try {
+    if (activa) localStorage.setItem(SESSION_HINT_KEY, '1')
+    else localStorage.removeItem(SESSION_HINT_KEY)
+  } catch {}
+  if (activa) document.documentElement.dataset.session = '1'
+  else delete document.documentElement.dataset.session
+}
 
 export const LOGOUT_FLAG = 'showLogoutToast'
 

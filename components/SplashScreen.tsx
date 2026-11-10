@@ -5,22 +5,23 @@ import { faGraduationCap } from '@fortawesome/free-solid-svg-icons'
 /** Color del borde superior del degradado (ver `--splash-top` en globals.css). */
 const SPLASH_TOP = { light: '#2e2a85', dark: '#120f33' }
 
-export default function SplashScreen() {
+/** `soloConSesion`: solo se muestra si html[data-session] indica que había sesión iniciada. */
+export default function SplashScreen({ soloConSesion = false }: { soloConSesion?: boolean }) {
   // iOS pinta la barra de estado con theme-color: mientras se ve el splash
   // la igualamos al degradado para que no quede una franja de otro color.
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]')
-    if (!meta) return
+    if (!meta || (soloConSesion && document.documentElement.dataset.session !== '1')) return
     const previous = meta.getAttribute('content')
     const dark = document.documentElement.dataset.theme === 'dark'
     meta.setAttribute('content', dark ? SPLASH_TOP.dark : SPLASH_TOP.light)
     return () => {
       if (previous) meta.setAttribute('content', previous)
     }
-  }, [])
+  }, [soloConSesion])
 
   return (
-    <div className="app-splash" role="status" aria-label="Cargando">
+    <div className={`app-splash ${soloConSesion ? 'app-splash--session-only' : ''}`} role="status" aria-label="Cargando">
       <span className="app-splash__blob app-splash__blob--1" aria-hidden="true" />
       <span className="app-splash__blob app-splash__blob--2" aria-hidden="true" />
       <span className="app-splash__blob app-splash__blob--3" aria-hidden="true" />

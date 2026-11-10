@@ -23,50 +23,90 @@ export default function Modal({ open, title, subtitle, onClose, children, onSubm
 
   useEffect(() => setMounted(true), [])
 
-  // En iOS el teclado no redimensiona la página: ajustamos la capa al área
-  // realmente visible (visualViewport) para que la hoja quede encima del teclado.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  // Bloquea el fondo mientras el modal está abierto. En iOS `overflow: hidden`
+  // no basta: fijamos el body en su posición actual y la restauramos al cerrar.
+  useEffect(() => {
+    if (!open) return
+    const scrollY = window.scrollY
+    const body = document.body.style
+    const previo = { position: body.position, top: body.top, left: body.left, right: body.right, overflow: body.overflow }
+    Object.assign(body, { position: 'fixed', top: `-${scrollY}px`, left: '0', right: '0', overflow: 'hidden' })
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      Object.assign(body, previo)
+      window.scrollTo(0, scrollY)
+    }
+  }, [open])
+
+  // Teclado en iOS: no redimensiona la página y además desplaza la vista para
+  // enseñar el campo enfocado. Anulamos ese desplazamiento (la app de fondo no se
+  // mueve), ajustamos la capa al área visible para que la hoja quede encima del
+  // teclado y llevamos el campo a la vista desplazando solo el interior de la hoja.
   useEffect(() => {
     const viewport = window.visualViewport
     if (!open || !mounted || !viewport) return
 
+    let frame = 0
+
     const update = () => {
+      if (window.scrollY !== 0 || viewport.offsetTop !== 0) window.scrollTo(0, 0)
       const layer = layerRef.current
       if (!layer) return
       layer.style.top = `${viewport.offsetTop}px`
       layer.style.height = `${viewport.height}px`
       layer.classList.toggle('has-keyboard', window.innerHeight - viewport.height > 120)
     }
+
+    const mostrarCampo = () => {
+      const campo = document.activeElement as HTMLElement | null
+      const contenedor = campo?.closest<HTMLElement>('.sheet__body')
+      if (!campo || !contenedor || !campo.matches('input, select, textarea')) return
+      const margen = 12
+      const caja = contenedor.getBoundingClientRect()
+      const rect = campo.getBoundingClientRect()
+      if (rect.bottom > caja.bottom - margen) contenedor.scrollTop += rect.bottom - caja.bottom + margen
+      else if (rect.top < caja.top + margen) contenedor.scrollTop -= caja.top + margen - rect.top
+    }
+
+    // Mientras el teclado se anima, corregimos cada fotograma para que no se vea el salto.
+    const seguirTeclado = () => {
+      cancelAnimationFrame(frame)
+      const fin = performance.now() + 700
+      const tick = () => {
+        update()
+        if (performance.now() < fin) frame = requestAnimationFrame(tick)
+        else mostrarCampo()
+      }
+      frame = requestAnimationFrame(tick)
+    }
+
     const onFocusIn = (event: FocusEvent) => {
-      const target = event.target as HTMLElement
-      if (!target.matches('input, select, textarea')) return
-      // Espera a que el teclado termine de aparecer antes de centrar el campo.
-      window.setTimeout(() => target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 300)
+      if ((event.target as HTMLElement).matches('input, select, textarea')) seguirTeclado()
+    }
+    const onResize = () => {
+      update()
+      mostrarCampo()
     }
 
     update()
-    viewport.addEventListener('resize', update)
+    viewport.addEventListener('resize', onResize)
     viewport.addEventListener('scroll', update)
     document.addEventListener('focusin', onFocusIn)
     return () => {
-      viewport.removeEventListener('resize', update)
+      cancelAnimationFrame(frame)
+      viewport.removeEventListener('resize', onResize)
       viewport.removeEventListener('scroll', update)
       document.removeEventListener('focusin', onFocusIn)
     }
   }, [open, mounted])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [open, onClose])
 
   if (!open || !mounted) return null
 

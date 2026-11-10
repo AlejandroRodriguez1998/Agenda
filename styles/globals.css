@@ -86,11 +86,52 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
+  /* sin rebote elástico ni "tirar para recargar" */
+  overscroll-behavior: none;
 }
+
+/* ---------- Sensación de app nativa ---------- */
 
 body {
   overflow-x: hidden;
+  /* sin selección de texto ni menú de pulsación larga en la interfaz */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* donde sí tiene sentido seleccionar y pegar */
+input,
+textarea,
+select,
+[contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+img,
+svg,
+a {
+  -webkit-user-drag: none;
+}
+
+/* respuesta táctil inmediata al pulsar, como en las apps nativas */
+@media (hover: none) {
+  .card button:active,
+  .task__body:active,
+  .agenda-item:active,
+  .class-card:active,
+  .subject:active,
+  .grade-row:active,
+  .upcoming button:active,
+  .action-list button:active,
+  .stat:active,
+  .month__day:active,
+  .week-strip__day:active {
+    opacity: 0.7;
+    transition: opacity 0s;
+  }
 }
 
 h1,
@@ -223,8 +264,10 @@ img {
   color: var(--page-accent-text);
 }
 
-.btn--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--page-accent) 88%, #000);
+@media (hover: hover) {
+  .btn--primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--page-accent) 88%, #000);
+  }
 }
 
 .btn--secondary {
@@ -237,8 +280,10 @@ img {
   border-color: var(--page-border);
 }
 
-.btn--ghost:hover:not(:disabled) {
-  background: var(--page-surface-soft);
+@media (hover: hover) {
+  .btn--ghost:hover:not(:disabled) {
+    background: var(--page-surface-soft);
+  }
 }
 
 .btn--danger {
@@ -275,9 +320,11 @@ img {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.icon-btn:hover {
-  background: var(--page-surface-soft);
-  color: var(--page-text);
+@media (hover: hover) {
+  .icon-btn:hover {
+    background: var(--page-surface-soft);
+    color: var(--page-text);
+  }
 }
 
 .icon-btn--sm {
@@ -287,9 +334,11 @@ img {
   font-size: 0.85rem;
 }
 
-.icon-btn--danger:hover {
-  background: var(--danger-soft);
-  color: var(--danger);
+@media (hover: hover) {
+  .icon-btn--danger:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
 }
 
 /* ---------- Formularios ---------- */
@@ -1166,8 +1215,10 @@ select.input {
   text-align: left;
 }
 
-.action-list button:hover {
-  background: var(--page-surface-soft);
+@media (hover: hover) {
+  .action-list button:hover {
+    background: var(--page-surface-soft);
+  }
 }
 
 .action-list button > span:last-child {
@@ -1306,6 +1357,15 @@ select.input {
   color: #fff;
   animation: splash-gradient 8s ease-in-out infinite;
   --splash-top: #2e2a85;
+}
+
+/* En la landing el splash solo aparece si había sesión iniciada (ver lib/auth.tsx). */
+.app-splash--session-only {
+  display: none;
+}
+
+html[data-session='1'] .app-splash--session-only {
+  display: grid;
 }
 
 html[data-theme='dark'] .app-splash {
@@ -1885,8 +1945,10 @@ html[data-theme='dark'] .app-splash {
   box-shadow: 0 0 0 9px transparent;
 }
 
-.check:hover {
-  color: color-mix(in srgb, var(--item, var(--page-accent)) 70%, transparent);
+@media (hover: hover) {
+  .check:hover {
+    color: color-mix(in srgb, var(--item, var(--page-accent)) 70%, transparent);
+  }
 }
 
 .check:active {
@@ -1975,8 +2037,10 @@ html[data-theme='dark'] .app-splash {
   text-align: left;
 }
 
-.upcoming button:hover {
-  background: var(--page-surface-soft);
+@media (hover: hover) {
+  .upcoming button:hover {
+    background: var(--page-surface-soft);
+  }
 }
 
 .upcoming button > span:last-child {
@@ -2170,9 +2234,11 @@ html[data-theme='dark'] .app-splash {
   transition: filter 0.15s ease;
 }
 
-.block:hover {
-  filter: brightness(0.97);
-  z-index: 2;
+@media (hover: hover) {
+  .block:hover {
+    filter: brightness(0.97);
+    z-index: 2;
+  }
 }
 
 .block strong {
@@ -2488,8 +2554,10 @@ html[data-theme='dark'] .app-splash {
   background: var(--item);
 }
 
-.subject:hover {
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .subject:hover {
+    transform: translateY(-2px);
+  }
 }
 
 .subject__head {
@@ -2880,9 +2948,11 @@ html[data-theme='dark'] .app-splash {
   color: var(--page-muted);
 }
 
-.estudio-lista .estudio-lista__edit:hover {
-  background: color-mix(in srgb, var(--page-accent) 14%, transparent);
-  color: var(--page-accent);
+@media (hover: hover) {
+  .estudio-lista .estudio-lista__edit:hover {
+    background: color-mix(in srgb, var(--page-accent) 14%, transparent);
+    color: var(--page-accent);
+  }
 }
 
 .estudio-lista .estudio-lista__add {

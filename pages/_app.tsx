@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from '@/lib/auth'
 import { DataProvider } from '@/lib/data'
 import { EstudioProvider, useEstudio } from '@/components/EstudioContext'
 import { ThemeProvider } from '@/lib/theme'
+import { bloquearZoom } from '@/lib/ui'
 
 // Los estilos de FontAwesome se importan arriba; evita que los inyecte en runtime (parpadeo de iconos).
 config.autoAddCss = false
@@ -30,7 +31,17 @@ function RouteGuard({ children }: { children: ReactNode }) {
     }
   }, [mustRedirect, router])
 
-  if (!ready || mustRedirect) return <SplashScreen />
+  if (mustRedirect || (!ready && !isPublic)) return <SplashScreen />
+  // En `/` la landing se pinta ya; el splash solo se ve encima si había sesión
+  // (html[data-session]), mientras Firebase confirma el usuario y carga el panel.
+  if (!ready && router.pathname === '/') {
+    return (
+      <>
+        {children}
+        <SplashScreen soloConSesion />
+      </>
+    )
+  }
   return <>{children}</>
 }
 
@@ -40,6 +51,8 @@ function StudyPage({ Component, pageProps }: Pick<AppProps, 'Component' | 'pageP
 }
 
 export default function App({ Component, pageProps }: AppProps) {
+  useEffect(() => bloquearZoom(), [])
+
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return
     navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('SW no registrado', err))
@@ -48,8 +61,8 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <ThemeProvider>
       <Head>
-        {/* viewport-fit=cover activa env(safe-area-inset-*) en iPhone; resizes-content hace que en Android el teclado redimensione la página */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+        {/* Sin zoom (como una app nativa); viewport-fit=cover activa env(safe-area-inset-*) en iPhone; resizes-content hace que en Android el teclado redimensione la página */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
       </Head>
       <AuthProvider>
         <EstudioProvider>

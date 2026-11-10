@@ -60,3 +60,23 @@ export const useMediaQuery = (queryText: string) => {
 }
 
 export const MOBILE_QUERY = '(max-width: 860px)'
+
+/**
+ * Safari ignora `user-scalable=no`: bloqueamos a mano el pellizco (gesture*)
+ * y el zoom con dos dedos para que la PWA se comporte como una app nativa.
+ * El doble toque ya lo evita `touch-action: manipulation` en globals.css.
+ */
+export const bloquearZoom = () => {
+  const prevenir = (event: Event) => event.preventDefault()
+  const pellizco = (event: TouchEvent) => {
+    if (event.touches.length > 1) event.preventDefault()
+  }
+  document.addEventListener('gesturestart', prevenir)
+  document.addEventListener('gesturechange', prevenir)
+  document.addEventListener('touchmove', pellizco, { passive: false })
+  return () => {
+    document.removeEventListener('gesturestart', prevenir)
+    document.removeEventListener('gesturechange', prevenir)
+    document.removeEventListener('touchmove', pellizco)
+  }
+}
