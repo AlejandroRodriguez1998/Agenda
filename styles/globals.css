@@ -1089,7 +1089,7 @@ select.input {
 }
 
 .sheet__footer {
-  padding: 12px 20px calc(12px + var(--safe-bottom));
+  padding: 12px 20px calc(24px + var(--safe-bottom));
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -1100,9 +1100,18 @@ select.input {
   flex: 1;
 }
 
+/* Sin footer (p. ej. Ajustes), el propio contenido deja el hueco inferior. */
+.sheet__body:last-child {
+  padding-bottom: calc(28px + var(--safe-bottom));
+}
+
 /* Con el teclado abierto no hace falta reservar la zona del indicador de inicio. */
 .has-keyboard .sheet__footer {
   padding-bottom: 12px;
+}
+
+.has-keyboard .sheet__body:last-child {
+  padding-bottom: 16px;
 }
 
 .has-keyboard .sheet {
@@ -1136,6 +1145,10 @@ select.input {
 
   .sheet__footer {
     padding-bottom: 16px;
+  }
+
+  .sheet__body:last-child {
+    padding-bottom: 20px;
   }
 
   .sheet__footer .btn--primary {
